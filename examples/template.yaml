@@ -1,0 +1,15 @@
+-
+  text:
+    value: "Hello, World!"
+    position:
+      x: 0
+      y: 0
+
+{{ if .running }}
+-
+  text:
+    value: "Running"
+    position:
+      x: 0
+      y: 20
+{{ end }}
