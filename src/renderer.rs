@@ -13,17 +13,17 @@ use serde::{Deserialize, Serialize};
 use yaml_merge_keys::serde_yaml;
 
 pub trait ColorFromTemplate {
-    fn resolve(color: &str) -> Self;
+    fn resolve(color: &Option<String>) -> Self;
 }
 
 // EPD specific implem.
 impl ColorFromTemplate for BinaryColor {
-    fn resolve(color: &str) -> Self {
-        match color {
-            "black" => BinaryColor::Off,
-            "0" => BinaryColor::Off,
-            "white" => BinaryColor::On,
-            "1" => BinaryColor::On,
+    fn resolve(color: &Option<String>) -> Self {
+        match color.as_ref().map(|s| s.as_str()) {
+            Some("black") => BinaryColor::Off,
+            Some("0") => BinaryColor::Off,
+            Some("white") => BinaryColor::On,
+            Some("1") => BinaryColor::On,
             _ => BinaryColor::Off,
         }
     }
@@ -46,6 +46,7 @@ pub struct TextItem {
     pub value: String,
     pub position: Point,
     pub font: Option<String>,
+    pub color: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -89,7 +90,7 @@ where
 {
     let style = MonoTextStyleBuilder::new()
         .font(&embedded_graphics::mono_font::ascii::FONT_6X10)
-        .text_color(TargetColor::resolve("white"))
+        .text_color(TargetColor::resolve(&text.color))
         .build();
     let text_style = TextStyleBuilder::new().baseline(Baseline::Top).build();
 
@@ -202,6 +203,7 @@ mod tests {
                 value: "Hello, World!".to_string(),
                 position: Point { x: 0, y: 0 },
                 font: None,
+                color: None
             })
         );
     }
@@ -259,6 +261,7 @@ mod tests {
             value: "Hello, World!".to_string(),
             position: Point { x: 0, y: 0 },
             font: None,
+            color: Some("0".to_string()),
         })];
 
         let result = draw(&mut display, &primitives);
