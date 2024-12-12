@@ -77,6 +77,14 @@ impl<C> BinaryFrameBuffer<C> {
         let (byte, mask) = get_bit(index);
         self.buffer[byte] & mask != 0
     }
+    pub fn set_bit(&mut self, index: usize, value: bool) {
+        let (byte, mask) = get_bit(index);
+        if value {
+            self.buffer[byte] |= mask;
+        } else {
+            self.buffer[byte] &= !mask;
+        }
+    }
 }
 
 impl<C: PixelColor + BinarisedColor> FrameBufferBackend for &mut BinaryFrameBuffer<C> {

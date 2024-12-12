@@ -197,6 +197,40 @@ mod tests {
     }
 
     #[test]
+    fn test_bit_rendering() {
+        let w = 40;
+        let size = Size {
+            width: 40,
+            height: 26,
+        };
+
+        let mut buffer = BinaryFrameBuffer::<BinaryColor>::new(size.width, size.height);
+
+        buffer.set_bit(0, true);
+        buffer.set_bit(1, false);
+        buffer.set_bit(2, true);
+        buffer.set_bit(w + 0, false);
+        buffer.set_bit(w + 1, true);
+        buffer.set_bit(w + 2, false);
+
+        let display = to_display_string(
+            &buffer,
+            Some(Size {
+                width: 4,
+                height: 2,
+            }),
+        );
+        println!("{}", display);
+
+        assert_eq!(
+            String::from("\n") + &display,
+            r#"
+▀▄▀ 
+"#
+        );
+    }
+
+    #[test]
     fn test_render() {
         let size = Size {
             width: 90,
