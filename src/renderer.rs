@@ -45,6 +45,7 @@ impl Into<embedded_graphics::geometry::Point> for Point {
 pub struct TextItem {
     pub value: String,
     pub position: Point,
+    pub font: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -81,27 +82,35 @@ pub fn parse(yaml: serde_yaml::Value) -> Result<Vec<Primitive>, Error> {
     Ok(primitives)
 }
 
-pub fn draw<D, TargetColor>(display: &mut D, primitives: Vec<Primitive>) -> Result<(), Error>
+pub fn draw_text<D, TargetColor>(display: &mut D, text: &TextItem) -> Result<(), D::Error>
+where
+    D: DrawTarget<Color = TargetColor>,
+    TargetColor: PixelColor + ColorFromTemplate,
+{
+    let style = MonoTextStyleBuilder::new()
+        .font(&embedded_graphics::mono_font::ascii::FONT_6X10)
+        .text_color(TargetColor::resolve("white"))
+        .build();
+    let text_style = TextStyleBuilder::new().baseline(Baseline::Top).build();
+
+    Text::with_text_style(&text.value, text.position.clone().into(), style, text_style)
+        .draw(display)
+        .map(|_| ())
+}
+
+pub fn draw<D, TargetColor>(display: &mut D, primitives: &Vec<Primitive>) -> Result<(), Error>
 where
     D: DrawTarget<Color = TargetColor>,
     TargetColor: PixelColor + ColorFromTemplate,
 {
     for primitive in primitives {
         println!("Rendering {:?}", primitive);
-        match primitive {
-            Primitive::Dummy(_) => {}
-            Primitive::Text(text) => {
-                let style = MonoTextStyleBuilder::new()
-                    .font(&embedded_graphics::mono_font::ascii::FONT_6X10)
-                    .text_color(TargetColor::resolve("white"))
-                    .build();
-                let text_style = TextStyleBuilder::new().baseline(Baseline::Top).build();
-
-                // FIXME: mess with custom errors... :-(
-                Text::with_text_style(&text.value, text.position.into(), style, text_style)
-                    .draw(display)
-                    .map_err(|_e| println!("drawing error"));
-            }
+        let problem = match primitive {
+            Primitive::Dummy(_) => Ok(()),
+            Primitive::Text(text) => draw_text::<D, TargetColor>(display, text),
+        };
+        if problem.is_err() {
+            return Err(Error::DrawingError());
         }
     }
     Ok(())
@@ -191,7 +200,8 @@ mod tests {
             result[1],
             Primitive::Text(TextItem {
                 value: "Hello, World!".to_string(),
-                position: Point { x: 0, y: 0 }
+                position: Point { x: 0, y: 0 },
+                font: None,
             })
         );
     }
@@ -248,9 +258,10 @@ mod tests {
         let primitives = vec![Primitive::Text(TextItem {
             value: "Hello, World!".to_string(),
             position: Point { x: 0, y: 0 },
+            font: None,
         })];
 
-        let result = draw(&mut display, primitives);
+        let result = draw(&mut display, &primitives);
         result.unwrap();
 
         let display = to_display_string(

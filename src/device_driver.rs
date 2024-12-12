@@ -33,7 +33,7 @@ fn render<Color: PixelColor + BinarisedColor + ColorFromTemplate + Default>(
     );
     display.clear(Color::default()).unwrap();
 
-    renderer::draw(&mut display, primitives)?;
+    renderer::draw(&mut display, &primitives)?;
 
     Ok(())
 }

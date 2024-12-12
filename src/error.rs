@@ -8,6 +8,7 @@ pub enum Error {
     TemplateError(TemplateError),
     MergeKeyError(MergeKeyError),
     InvalidPrimitive(i32, serde_yaml::Error),
+    DrawingError(),
     HWError(String),
 }
 
@@ -19,6 +20,7 @@ impl IntoResponse for Error {
             Error::MergeKeyError(e) => format!("Merge key error: {e}"),
             Error::InvalidPrimitive(i, e) => format!("Invalid primitive at index {}: {}", i, e),
             Error::HWError(r) => format!("Hardware error: {r}"),
+            Error::DrawingError() => "Drawing error".to_string(),
         };
 
         println!("Error: {r}");
