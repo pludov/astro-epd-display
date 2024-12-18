@@ -7,7 +7,7 @@ use crate::{
 use embedded_graphics::pixelcolor::BinaryColor;
 use std::sync::mpsc::Receiver;
 
-struct StdoutDevice {
+pub struct StdoutDevice {
     buffer: BinaryFrameBuffer<BinaryColor>,
 }
 
@@ -36,9 +36,9 @@ impl Device for StdoutDevice {
     }
 }
 
-pub fn drive_stdout(signal: Receiver<()>) {
+pub fn drive_stdout(signal: Receiver<()>, width: u32, height: u32) {
     let mut device = StdoutDevice {
-        buffer: BinaryFrameBuffer::<BinaryColor>::new(200, 120),
+        buffer: BinaryFrameBuffer::<BinaryColor>::new(width, height),
     };
 
     drive_device(&mut device, signal)

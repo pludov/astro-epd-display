@@ -1,4 +1,5 @@
 mod binary_framebuffer;
+mod cli;
 mod debug;
 mod device_driver;
 mod epd_driver;
@@ -7,7 +8,10 @@ mod renderer;
 mod state;
 mod stdout_driver;
 mod templater;
+
 use axum::{response::Html, routing::get, Router};
+use clap::Parser;
+use cli::Args;
 
 use std::net::SocketAddr;
 use std::{
@@ -135,17 +139,24 @@ async fn root() -> Html<&'static str> {
     )
 }
 
-fn run_device(receiver: Receiver<()>) {
-    //stdout_driver::drive_stdout(receiver);
-    epd_driver::drive_epd(receiver);
+fn run_device(receiver: Receiver<()>, args: &Args) {
+    match args.driver {
+        cli::Driver::Epd => epd_driver::drive_epd(receiver),
+        cli::Driver::Stdout => stdout_driver::drive_stdout(receiver, args.width, args.height),
+    }
 }
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
+    let args = Args::parse();
+
     let (sender, receiver) = std::sync::mpsc::sync_channel::<()>(1);
 
-    std::thread::spawn(|| {
-        run_device(receiver);
+    std::thread::spawn({
+        let args = args.clone();
+        move || {
+            run_device(receiver, &args);
+        }
     });
 
     let local = task::LocalSet::new();

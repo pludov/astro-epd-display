@@ -1,9 +1,7 @@
 mod alignment;
 
-use crate::{
-    binary_framebuffer::{BinarisedColor, BinaryFrameBuffer},
-    error::Error,
-};
+use crate::binary_framebuffer::{BinarisedColor, BinaryFrameBuffer};
+use crate::error::Error;
 use embedded_graphics::{mono_font::MonoFont, text::Alignment, Drawable};
 use embedded_graphics::{
     mono_font::MonoTextStyleBuilder,
