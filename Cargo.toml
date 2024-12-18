@@ -31,3 +31,5 @@ gtmpl_derive = "0.5.0"
 gtmpl_value = "0.5.1"
 yaml-merge-keys = { version = "0.7.0", features = ["serde_yaml"] }
 embedded-graphics-framebuf = "0.5.0"
+assert_ok = "1.0.2"
+serde_with = "3.11.0"
