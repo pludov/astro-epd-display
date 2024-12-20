@@ -34,3 +34,4 @@ embedded-graphics-framebuf = "0.5.0"
 assert_ok = "1.0.2"
 serde_with = "3.11.0"
 clap = { version = "4.5.23", features = ["derive"] }
+qrcode = "0.14.1"

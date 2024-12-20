@@ -1,9 +1,11 @@
 mod alignment;
+mod qrcode;
 mod text;
 
 use crate::binary_framebuffer::{BinarisedColor, BinaryFrameBuffer};
 use crate::error::Error;
 use embedded_graphics::{pixelcolor::BinaryColor, prelude::*};
+use qrcode::{draw_qrcode, QRCode};
 use serde::{Deserialize, Serialize};
 use text::{draw_text, TextItem};
 use yaml_merge_keys::serde_yaml;
@@ -46,6 +48,7 @@ pub enum Primitive {
     #[serde(rename = "x-ignore")]
     Dummy(Dummy),
     Text(TextItem),
+    QRCode(QRCode),
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -81,6 +84,7 @@ where
         let problem = match primitive {
             Primitive::Dummy(_) => Ok(()),
             Primitive::Text(text) => draw_text::<D, TargetColor>(display, text),
+            Primitive::QRCode(qr) => draw_qrcode::<D, TargetColor>(display, qr),
         };
         if problem.is_err() {
             return Err(Error::DrawingError());
@@ -216,7 +220,7 @@ mod tests {
         );
     }
 
-    pub fn render(size: Size, primitives: Vec<Primitive>) -> String {
+    pub fn render(size: Size, primitives: Vec<Primitive>, bounds: Option<Size>) -> String {
         let mut buffer = BinaryFrameBuffer::<BinaryColor>::new(size.width, size.height);
         let mut display = FrameBuf::<BinaryColor, &mut BinaryFrameBuffer<BinaryColor>>::new(
             &mut buffer,
@@ -230,13 +234,7 @@ mod tests {
         let result = draw(&mut display, &primitives);
         result.unwrap();
 
-        let display = to_display_string(
-            &buffer,
-            Some(Size {
-                width: 81,
-                height: 12,
-            }),
-        );
+        let display = to_display_string(&buffer, bounds);
         println!("{}", display);
 
         display

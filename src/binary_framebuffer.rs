@@ -1,4 +1,10 @@
-use embedded_graphics::prelude::PixelColor;
+use core::fmt;
+use std::fmt::{Debug, Formatter};
+
+use embedded_graphics::{
+    prelude::{PixelColor, Point, Size},
+    Pixel,
+};
 use embedded_graphics_framebuf::backends::FrameBufferBackend;
 
 pub trait BinarisedColor {
@@ -63,6 +69,13 @@ impl<C> BinaryFrameBuffer<C> {
         self.height
     }
 
+    pub fn dimensions(&self) -> Size {
+        Size {
+            width: self.width,
+            height: self.height,
+        }
+    }
+
     pub fn buffer(&self) -> &[u8] {
         &self.buffer
     }
@@ -87,6 +100,34 @@ impl<C> BinaryFrameBuffer<C> {
     }
 }
 
+impl<C: PixelColor + BinarisedColor> BinaryFrameBuffer<C> {
+    pub fn set_pixel(&mut self, x: u32, y: u32, color: C) {
+        let index = (y * self.width + x) as usize;
+        let (byte, mask) = get_bit(index);
+        if color.to_binary_color() {
+            self.buffer[byte] |= mask;
+        } else {
+            self.buffer[byte] &= !mask;
+        }
+    }
+
+    pub fn get_pixel(&self, x: u32, y: u32) -> C {
+        let index = (y * self.width + x) as usize;
+        let b = self.get_bit(index);
+        C::from_binary_color(b)
+    }
+
+    pub fn iter(&self) -> impl IntoIterator<Item = Pixel<C>> + use<'_, C> {
+        (0..self.size).map(move |i| {
+            let b = self.get_bit(i);
+            Pixel(
+                Point::new(i as i32 % self.width as i32, i as i32 / self.width as i32),
+                C::from_binary_color(b),
+            )
+        })
+    }
+}
+
 impl<C: PixelColor + BinarisedColor> FrameBufferBackend for &mut BinaryFrameBuffer<C> {
     type Color = C;
 
@@ -108,5 +149,20 @@ impl<C: PixelColor + BinarisedColor> FrameBufferBackend for &mut BinaryFrameBuff
     /// Nr of elements in the backend
     fn nr_elements(&self) -> usize {
         self.size
+    }
+}
+
+impl<C> Debug for BinaryFrameBuffer<C> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        // Count 0 & 1
+        let mut count = [0, 0];
+        for i in 0..self.size {
+            count[self.get_bit(i) as usize] += 1;
+        }
+        write!(
+            f,
+            "BinaryFrameBuffer<BinaryColor>(width: {}, height: {}, 0: {}, 1: {})",
+            self.width, self.height, count[0], count[1]
+        )
     }
 }
