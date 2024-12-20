@@ -64,6 +64,7 @@ pub struct QRCode {
     pub value: String,
     pub position: Point,
     pub color: Option<String>,
+    pub background: Option<String>,
     #[serde(with = "eclevel", default = "eclevel::default")]
     pub ec_level: Option<qrcode::EcLevel>,
     pub width: u32,
@@ -175,15 +176,27 @@ where
         .quiet_zone(true)
         .build();
 
-    let dark = TargetColor::resolve(&Some("0".to_string()));
-    let light = TargetColor::resolve(&Some("1".to_string()));
+    let (back, front) = if qrcode.color.is_some() && qrcode.background.is_some() {
+        (
+            TargetColor::resolve(&qrcode.background),
+            TargetColor::resolve(&qrcode.color),
+        )
+    } else if qrcode.background.is_some() {
+        let back = TargetColor::resolve(&qrcode.background);
+        let color = back.invert();
+        (back, color)
+    } else {
+        let color = TargetColor::resolve(&qrcode.color);
+        let back = color.invert();
+        (back, color)
+    };
 
     display.fill_solid(
         &Rectangle {
             top_left: qrcode.position.clone().into(),
             size: Size::new(qrcode.width, qrcode.height),
         },
-        dark,
+        back,
     )?;
 
     let actual_size = res.dimensions();
@@ -214,7 +227,7 @@ where
                     x: p.x + shift.0,
                     y: p.y + shift.1,
                 };
-                embedded_graphics::Pixel(new_p, if c { dark } else { light })
+                embedded_graphics::Pixel(new_p, if c { back } else { front })
             }),
     )?;
 
@@ -229,7 +242,136 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_render_qr() {
+    fn test_color_1() {
+        let display = render(
+            Size {
+                width: 32,
+                height: 32,
+            },
+            vec![Primitive::QRCode(QRCode {
+                value: "Hello, World!".to_string(),
+                position: Point { x: 0, y: 0 },
+                color: Some("1".to_string()),
+                background: None,
+                ec_level: None,
+                width: 32,
+                height: 32,
+            })],
+            None,
+        );
+
+        assert_eq!(
+            String::from("\n") + &display,
+            r#"
+                                
+                                
+     ▄▄▄▄▄▄▄ ▄  ▄  ▄▄▄▄▄▄▄      
+     █ ▄▄▄ █ ▀█ ▄  █ ▄▄▄ █      
+     █ ███ █ ▀█▄█  █ ███ █      
+     █▄▄▄▄▄█ ▄▀▄▀█ █▄▄▄▄▄█      
+     ▄ ▄▄ ▄▄▄▀█ ██ ▄  ▄ ▄▄      
+     ▄▄▀ █▀▄▀▀█▄▄▀█ ▄ ▀▀▄█      
+     █ █▄ ▄▄ ▀▀█▀▄ ▄▄▀▀ ▀▄      
+     ▄▄▄▄▄▄▄ █▄█▀▀▀▄ █ ▀ ▀      
+     █ ▄▄▄ █ ▀██ ▀█ █▄███       
+     █ ███ █ █  ▄█▀▄▄ ▀█▀       
+     █▄▄▄▄▄█ ▄ ██▄███▀ ▄ ▀      
+                                
+                                
+                                
+"#
+        );
+    }
+
+    #[test]
+    fn test_color_0() {
+        let display = render(
+            Size {
+                width: 32,
+                height: 32,
+            },
+            vec![Primitive::QRCode(QRCode {
+                value: "Hello, World!".to_string(),
+                position: Point { x: 0, y: 0 },
+                color: Some("0".to_string()),
+                background: None,
+                ec_level: None,
+                width: 32,
+                height: 32,
+            })],
+            None,
+        );
+
+        assert_eq!(
+            String::from("\n") + &display,
+            r#"
+████████████████████████████████
+████████████████████████████████
+█████▀▀▀▀▀▀▀█▀██▀██▀▀▀▀▀▀▀██████
+█████ █▀▀▀█ █▄ █▀██ █▀▀▀█ ██████
+█████ █   █ █▄ ▀ ██ █   █ ██████
+█████ ▀▀▀▀▀ █▀▄▀▄ █ ▀▀▀▀▀ ██████
+█████▀█▀▀█▀▀▀▄ █  █▀██▀█▀▀██████
+█████▀▀▄█ ▄▀▄▄ ▀▀▄ █▀█▄▄▀ ██████
+█████ █ ▀█▀▀█▄▄ ▄▀█▀▀▄▄█▄▀██████
+█████▀▀▀▀▀▀▀█ ▀ ▄▄▄▀█ █▄█▄██████
+█████ █▀▀▀█ █▄  █▄ █ ▀   ███████
+█████ █   █ █ ██▀ ▄▀▀█▄ ▄███████
+█████ ▀▀▀▀▀ █▀█  ▀   ▄█▀█▄██████
+████████████████████████████████
+████████████████████████████████
+████████████████████████████████
+"#
+        );
+    }
+
+    #[test]
+    fn test_render_overflow() {
+        let display = render(
+            Size {
+                width: 32,
+                height: 32,
+            },
+            vec![Primitive::QRCode(QRCode {
+                value: "Hello, World!".to_string(),
+                position: Point { x: 16, y: 16 },
+                color: Some("0".to_string()),
+                background: None,
+                ec_level: None,
+                width: 32,
+                height: 32,
+            })],
+            Some(Size {
+                width: 32,
+                height: 32,
+            }),
+        );
+
+        assert_eq!(
+            String::from("\n") + &display,
+            r#"
+████████████████████████████████
+████████████████████████████████
+████████████████████████████████
+████████████████████████████████
+████████████████████████████████
+████████████████████████████████
+████████████████████████████████
+████████████████████████████████
+████████████████████████████████
+████████████████████████████████
+█████████████████████▀▀▀▀▀▀▀█▀██
+█████████████████████ █▀▀▀█ █▄ █
+█████████████████████ █   █ █▄ ▀
+█████████████████████ ▀▀▀▀▀ █▀▄▀
+█████████████████████▀█▀▀█▀▀▀▄ █
+█████████████████████▀▀▄█ ▄▀▄▄ ▀
+"#
+        );
+    }
+
+    #[test]
+    fn test_render_fill() {
         let display = render(
             Size {
                 width: 90,
@@ -239,6 +381,7 @@ mod tests {
                 value: "lés bon amis amös L3s €".to_string(),
                 position: Point { x: 4, y: 6 },
                 color: Some("0".to_string()),
+                background: None,
                 ec_level: Some(::qrcode::EcLevel::L),
                 width: 82,
                 height: 72,

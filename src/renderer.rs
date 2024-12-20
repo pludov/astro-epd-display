@@ -12,6 +12,7 @@ use yaml_merge_keys::serde_yaml;
 
 pub trait ColorFromTemplate {
     fn resolve(color: &Option<String>) -> Self;
+    fn invert(&self) -> Self;
 }
 
 // EPD specific implem.
@@ -23,6 +24,13 @@ impl ColorFromTemplate for BinaryColor {
             Some("white") => BinaryColor::On,
             Some("1") => BinaryColor::On,
             _ => BinaryColor::Off,
+        }
+    }
+
+    fn invert(&self) -> Self {
+        match self {
+            BinaryColor::Off => BinaryColor::On,
+            BinaryColor::On => BinaryColor::Off,
         }
     }
 }
