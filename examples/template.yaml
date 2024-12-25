@@ -4,6 +4,7 @@
     position:
       x: 0
       y: 0
+    color: "1"
 
 {{ if .running }}
 -
