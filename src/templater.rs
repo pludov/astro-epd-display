@@ -4,11 +4,14 @@ use axum::{
     Router,
 };
 
+use gtmpl::{Context, FuncError, Template};
 use once_cell::sync::Lazy;
 use serde_json::Value;
 use std::{
+    cell::RefCell,
     collections::HashMap,
     sync::{Arc, Mutex},
+    time::SystemTime,
 };
 use yaml_merge_keys::{merge_keys_serde, serde_yaml};
 
@@ -85,22 +88,92 @@ pub async fn get_rendered() -> Result<String, Error> {
     // let content: Vec<UIWrapper> = serde_yaml::from_value(merged_keys).unwrap();
 
     // println!("{:?}", content);
-    let yaml =
-        render(state).and_then(|yaml| serde_yaml::to_string(&yaml).map_err(Error::SerdeYaml))?;
+    let yaml = render(state, SystemTime::now())
+        .and_then(|(yaml, _)| serde_yaml::to_string(&yaml).map_err(Error::SerdeYaml))?;
 
     Ok(yaml)
 }
 
-pub fn render(state: Arc<Value>) -> Result<serde_yaml::Value, Error> {
-    let template = TEMPLATE.lock().unwrap().clone();
+struct RenderHiddenContext {
+    now: SystemTime,
+    next: Option<SystemTime>,
+}
 
-    let yaml = gtmpl::template(
-        &template,
-        JsonToYaml {
-            json: (*state).clone(),
-        },
-    )
-    .map_err(Error::TemplateError)?;
+thread_local! {
+    pub static HIDDEN_CONTEXT: RefCell<RenderHiddenContext> = RefCell::new(RenderHiddenContext{
+        now: SystemTime::UNIX_EPOCH,
+        next: None,
+    });
+}
+
+pub fn render(
+    state: Arc<Value>,
+    now: SystemTime,
+) -> Result<(serde_yaml::Value, Option<SystemTime>), Error> {
+    let template = TEMPLATE.lock().unwrap().clone();
+    render_template(template, state, now)
+}
+
+/// Function to return the current time, rounded to the nearest divisor
+/// The default divisor is 60 seconds
+fn func_time(args: &[gtmpl::Value]) -> Result<gtmpl::Value, FuncError> {
+    HIDDEN_CONTEXT.with(|h| {
+        let divisor = if args.len() > 0 {
+            match args[0] {
+                gtmpl::Value::Number(ref n) => {
+                    n.as_f64().ok_or(FuncError::UnableToConvertFromValue)?
+                }
+                _ => {
+                    return Err(FuncError::UnableToConvertFromValue);
+                }
+            }
+        } else {
+            60.0
+        };
+        let mut ctx = h.borrow_mut();
+
+        // Duration since epoch
+        let mut now_num = ctx
+            .now
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map(|e| e.as_secs_f64())
+            .map_err(|_| FuncError::UnableToConvertFromValue)?;
+
+        now_num = (now_num / divisor).floor() * divisor;
+
+        ctx.next =
+            Some(SystemTime::UNIX_EPOCH + std::time::Duration::from_secs_f64(now_num + divisor));
+
+        Ok(gtmpl::Value::from(now_num))
+    })
+}
+
+fn render_template(
+    template: Arc<String>,
+    state: Arc<Value>,
+    now: SystemTime,
+) -> Result<(serde_yaml::Value, Option<SystemTime>), Error> {
+    let context = JsonToYaml {
+        json: (*state).clone(),
+    };
+
+    HIDDEN_CONTEXT.with(|h| {
+        let mut ctx = h.borrow_mut();
+        ctx.now = now;
+        ctx.next = None;
+    });
+
+    let mut tmpl = Template::default();
+    tmpl.add_func("time", func_time);
+    tmpl.parse((*template).clone())
+        .map_err(Into::into)
+        .map_err(Error::TemplateError)?;
+
+    let yaml: String = tmpl
+        .render(&Context::from(context))
+        .map_err(Into::into)
+        .map_err(Error::TemplateError)?;
+
     println!("render: yaml = {}", yaml);
 
     let raw_yaml = serde_yaml::from_str(&yaml).map_err(Error::SerdeYaml)?;
@@ -108,5 +181,63 @@ pub fn render(state: Arc<Value>) -> Result<serde_yaml::Value, Error> {
     let merged_keys = merge_keys_serde(raw_yaml).map_err(Error::MergeKeyError)?;
     println!("render: merged_yaml = {:?}", merged_keys);
 
-    Ok(merged_keys)
+    let next = HIDDEN_CONTEXT.with(|h| {
+        let ctx = h.borrow();
+        ctx.next
+    });
+
+    Ok((merged_keys, next))
+}
+
+#[cfg(test)]
+mod test {
+    use std::time::Duration;
+
+    pub use super::*;
+    use serde_json::json;
+
+    // Test a simple rendering
+    #[test]
+    fn test_render() {
+        let state = Arc::new(json!({
+            "name": "world",
+        }));
+
+        let template = Arc::new("Hello: '{{ .name }}!'".to_string());
+
+        let now = SystemTime::now();
+
+        let (yaml, next) = render_template(template, state, now).unwrap();
+
+        assert_eq!(yaml, serde_yaml::Value::String("Hello, world!".to_string()));
+        assert_eq!(next, None);
+    }
+
+    #[test]
+    fn test_time() {
+        let state = Arc::new(json!({
+            "name": "world",
+        }));
+
+        let template = Arc::new("Hello: {{ time }}".to_string());
+
+        let now_sec = 3600 * 55 * 365 * 24;
+        let now_next_min = now_sec + 60;
+
+        let now = SystemTime::UNIX_EPOCH + Duration::from_secs(now_sec);
+
+        let (yaml, next) = render_template(template, state, now).unwrap();
+
+        let mut expected_map = serde_yaml::Mapping::new();
+        expected_map.insert(
+            serde_yaml::Value::String("Hello".to_string()),
+            serde_yaml::Value::Number(now_sec.into()),
+        );
+
+        assert_eq!(yaml, serde_yaml::Value::Mapping(expected_map));
+        assert_eq!(
+            next,
+            Some(SystemTime::UNIX_EPOCH + Duration::from_secs(now_next_min))
+        );
+    }
 }

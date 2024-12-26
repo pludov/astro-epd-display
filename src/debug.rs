@@ -1,3 +1,5 @@
+use std::time::SystemTime;
+
 use crate::error::Error;
 use crate::renderer::PrimitiveWrapper;
 use crate::{renderer, state, templater};
@@ -28,11 +30,11 @@ async fn get_debug() -> Result<Json<DebugResult>, Error> {
         primitives_error: None,
     };
     println!("State: {:?}", state);
-    let yaml = templater::render(state);
+    let yaml = templater::render(state, SystemTime::now());
     if yaml.is_err() {
         result.yaml_error = Some(format!("{:?}", yaml.err()));
     } else {
-        let yaml = yaml.unwrap();
+        let (yaml, _) = yaml.unwrap();
         result.yaml = Some(yaml.clone());
 
         let primitives = renderer::parse(yaml);

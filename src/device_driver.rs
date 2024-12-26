@@ -13,7 +13,7 @@ use std::{
         mpsc::{Receiver, RecvTimeoutError},
         Arc,
     },
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 
 fn render<Color: PixelColor + BinarisedColor + ColorFromTemplate + Default>(
@@ -21,7 +21,7 @@ fn render<Color: PixelColor + BinarisedColor + ColorFromTemplate + Default>(
     buffer: &mut BinaryFrameBuffer<Color>,
 ) -> Result<(), Error> {
     // Render the template
-    let yaml = templater::render(state)?;
+    let (yaml, _) = templater::render(state, SystemTime::now())?;
     let primitives = renderer::parse(yaml)?;
 
     // Then draw it
