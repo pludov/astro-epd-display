@@ -55,8 +55,10 @@ pub fn drive_device(device: &mut dyn Device, signal: Receiver<()>) {
     };
     println!("Size: {size}\n");
 
-    let mut _previous = BinaryFrameBuffer::<BinaryColor>::new(size.width, size.height);
+    let mut previous = BinaryFrameBuffer::<BinaryColor>::new(size.width, size.height);
     let mut buffer = BinaryFrameBuffer::<BinaryColor>::new(size.width, size.height);
+    let mut force_full_render = true;
+    let mut asleep = false;
 
     loop {
         let state = state::get_state();
@@ -70,7 +72,17 @@ pub fn drive_device(device: &mut dyn Device, signal: Receiver<()>) {
             // FIXME: do something more clever...
         } else {
             // FIXME : return errors
-            device.update(buffer.buffer()).unwrap();
+            if force_full_render || buffer.updated(&mut previous) {
+                if asleep {
+                    device.wake_up().expect("wakeup failed");
+                    asleep = false;
+                }
+                device.update(buffer.buffer()).unwrap();
+                if force_full_render {
+                    force_full_render = false;
+                    buffer.updated(&mut previous);
+                }
+            }
             sleep_limit = rendered.ok().flatten();
         }
 
@@ -82,12 +94,15 @@ pub fn drive_device(device: &mut dyn Device, signal: Receiver<()>) {
                 .or(Some(Duration::from_secs(0))),
         };
 
-        let mut asleep = false;
-        let steps = [Some(Duration::from_millis(50)), max_sleep];
+        let steps = if asleep {
+            &[max_sleep] as &[Option<Duration>]
+        } else {
+            &[Some(Duration::from_millis(50)), max_sleep]
+        };
 
         for (step_id, step) in steps.iter().enumerate() {
             // Wait for a signal
-            if step_id > 0 {
+            if step_id > 0 && !asleep {
                 println!("Sleeping device");
                 device.sleep().expect("sleep failed");
                 asleep = true;
@@ -109,9 +124,6 @@ pub fn drive_device(device: &mut dyn Device, signal: Receiver<()>) {
                     break;
                 }
             }
-        }
-        if asleep {
-            device.wake_up().expect("wakeup failed");
         }
     }
     //     // Setup the graphics
