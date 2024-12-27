@@ -1,4 +1,4 @@
-use embedded_graphics::{pixelcolor::BinaryColor, prelude::*};
+use embedded_graphics::{pixelcolor::BinaryColor, prelude::*, primitives::Rectangle};
 use embedded_graphics_framebuf::FrameBuf;
 use serde_json::Value;
 
@@ -46,6 +46,9 @@ pub trait Device {
     fn sleep(&mut self) -> Result<(), Error>;
     fn wake_up(&mut self) -> Result<(), Error>;
     fn update(&mut self, buffer: &[u8]) -> Result<(), Error>;
+    fn partial_update(&mut self, buffer: &[u8], _rects: &Vec<Rectangle>) -> Result<(), Error> {
+        self.update(buffer)
+    }
 }
 
 // This runs a thread
@@ -59,7 +62,7 @@ pub fn drive_device(device: &mut dyn Device, signal: Receiver<()>) {
     let mut previous = BinaryFrameBuffer::<BinaryColor>::new(size.width, size.height);
     let mut buffer = BinaryFrameBuffer::<BinaryColor>::new(size.width, size.height);
 
-    let mut change_tracker = BinaryChangeTracker::new(size.width, size.height);
+    let mut change_tracker = BinaryChangeTracker::new(size.width, size.height, 8);
     let mut force_full_render = true;
     let mut asleep = false;
 
@@ -77,7 +80,10 @@ pub fn drive_device(device: &mut dyn Device, signal: Receiver<()>) {
             // FIXME: do something more clever...
         } else {
             // FIXME : return errors
-            if force_full_render || change_tracker.update(&buffer, &mut previous) {
+            let mut changed_rects = Vec::new();
+            if force_full_render
+                || change_tracker.update(&buffer, &mut previous, &mut changed_rects)
+            {
                 if asleep {
                     device.wake_up().expect("wakeup failed");
                     asleep = false;
@@ -87,7 +93,14 @@ pub fn drive_device(device: &mut dyn Device, signal: Receiver<()>) {
                     force_full_render = true;
                 }
 
-                device.update(buffer.buffer()).unwrap();
+                if force_full_render {
+                    device.update(buffer.buffer()).unwrap();
+                } else {
+                    println!("Partial update: {:?}", changed_rects);
+                    device
+                        .partial_update(buffer.buffer(), &changed_rects)
+                        .unwrap();
+                }
                 if force_full_render {
                     force_full_render = false;
                     change_tracker.reset(&buffer, &mut previous);
