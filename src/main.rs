@@ -1,3 +1,4 @@
+mod binary_change_tracker;
 mod binary_framebuffer;
 mod cli;
 mod debug;

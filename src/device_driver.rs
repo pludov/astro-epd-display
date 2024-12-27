@@ -3,6 +3,7 @@ use embedded_graphics_framebuf::FrameBuf;
 use serde_json::Value;
 
 use crate::{
+    binary_change_tracker::BinaryChangeTracker,
     binary_framebuffer::{BinarisedColor, BinaryFrameBuffer},
     error::Error,
     renderer::{self, ColorFromTemplate},
@@ -57,8 +58,12 @@ pub fn drive_device(device: &mut dyn Device, signal: Receiver<()>) {
 
     let mut previous = BinaryFrameBuffer::<BinaryColor>::new(size.width, size.height);
     let mut buffer = BinaryFrameBuffer::<BinaryColor>::new(size.width, size.height);
+
+    let mut change_tracker = BinaryChangeTracker::new(size.width, size.height);
     let mut force_full_render = true;
     let mut asleep = false;
+
+    change_tracker.reset(&buffer, &mut previous);
 
     loop {
         let state = state::get_state();
@@ -72,15 +77,20 @@ pub fn drive_device(device: &mut dyn Device, signal: Receiver<()>) {
             // FIXME: do something more clever...
         } else {
             // FIXME : return errors
-            if force_full_render || buffer.updated(&mut previous) {
+            if force_full_render || change_tracker.update(&buffer, &mut previous) {
                 if asleep {
                     device.wake_up().expect("wakeup failed");
                     asleep = false;
                 }
+
+                if change_tracker.get_max_changes() > 128 {
+                    force_full_render = true;
+                }
+
                 device.update(buffer.buffer()).unwrap();
                 if force_full_render {
                     force_full_render = false;
-                    buffer.updated(&mut previous);
+                    change_tracker.reset(&buffer, &mut previous);
                 }
             }
             sleep_limit = rendered.ok().flatten();

@@ -69,24 +69,6 @@ impl<C> BinaryFrameBuffer<C> {
         self.height
     }
 
-    /// Compute changes in previous and update previous
-    /// TODO : return a set of rectangles to update
-    pub fn updated(&self, previous: &mut Self) -> bool {
-        if self.size != previous.size {
-            panic!("Framebuffers must have the same size");
-        }
-
-        let mut result = false;
-        for i in 0..bits_to_bytes_size(self.size) {
-            let new_value = self.buffer[i];
-            if new_value != previous.buffer[i] {
-                previous.buffer[i] = new_value;
-                result = true;
-            }
-        }
-        result
-    }
-
     pub fn dimensions(&self) -> Size {
         Size {
             width: self.width,
