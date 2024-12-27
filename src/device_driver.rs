@@ -19,9 +19,9 @@ use std::{
 fn render<Color: PixelColor + BinarisedColor + ColorFromTemplate + Default>(
     state: Arc<Value>,
     buffer: &mut BinaryFrameBuffer<Color>,
-) -> Result<(), Error> {
+) -> Result<Option<SystemTime>, Error> {
     // Render the template
-    let (yaml, _) = templater::render(state, SystemTime::now())?;
+    let (yaml, next) = templater::render(state, SystemTime::now())?;
     let primitives = renderer::parse(yaml)?;
 
     // Then draw it
@@ -35,7 +35,7 @@ fn render<Color: PixelColor + BinarisedColor + ColorFromTemplate + Default>(
 
     renderer::draw(&mut display, &primitives)?;
 
-    Ok(())
+    Ok(next)
 }
 
 pub trait Device {
@@ -60,34 +60,58 @@ pub fn drive_device(device: &mut dyn Device, signal: Receiver<()>) {
 
     loop {
         let state = state::get_state();
+        // FIXME: this render must produce a buffer, the buffer must be compared, then only
+        // the redraw must be done
         let rendered = render(state, &mut buffer);
+        let sleep_limit;
         if rendered.is_err() {
             println!("Error rendering: {:?}", rendered.err());
+            sleep_limit = None;
             // FIXME: do something more clever...
         } else {
             // FIXME : return errors
             device.update(buffer.buffer()).unwrap();
+            sleep_limit = rendered.ok().flatten();
         }
 
-        // Wait for a signal
-        match signal.recv_timeout(Duration::from_millis(50)) {
-            Err(RecvTimeoutError::Timeout) => {
-                println!("Sleeping");
+        let max_sleep = match sleep_limit {
+            None => None,
+            Some(t) => t
+                .duration_since(SystemTime::now())
+                .ok()
+                .or(Some(Duration::from_secs(0))),
+        };
 
+        let mut asleep = false;
+        let steps = [Some(Duration::from_millis(50)), max_sleep];
+
+        for (step_id, step) in steps.iter().enumerate() {
+            // Wait for a signal
+            if step_id > 0 {
+                println!("Sleeping device");
                 device.sleep().expect("sleep failed");
-                if signal.recv().is_err() {
+                asleep = true;
+            }
+            match if step.is_none() {
+                signal.recv().or(Err(RecvTimeoutError::Disconnected))
+            } else {
+                signal.recv_timeout(step.unwrap())
+            } {
+                Err(RecvTimeoutError::Timeout) => {
+                    continue;
+                }
+                Err(RecvTimeoutError::Disconnected) => {
                     break;
                 }
-                println!("Signal received during sleep");
-                device.wake_up().expect("wakeup failed");
+                Ok(_) => {
+                    // Signal received, do nothing
+                    println!("Signal received");
+                    break;
+                }
             }
-            Err(RecvTimeoutError::Disconnected) => {
-                break;
-            }
-            Ok(_) => {
-                // Signal received, do nothing
-                println!("Signal received");
-            }
+        }
+        if asleep {
+            device.wake_up().expect("wakeup failed");
         }
     }
     //     // Setup the graphics
