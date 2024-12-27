@@ -5,6 +5,7 @@ use axum::{
 };
 
 use gtmpl::{Context, FuncError, Template};
+use gtmpl_value::Number;
 use once_cell::sync::Lazy;
 use serde_json::Value;
 use std::{
@@ -114,15 +115,32 @@ pub fn render(
     render_template(template, state, now)
 }
 
+// Return a f64 from a gtmpl value
+fn gtmpl_number(n: &Number) -> Result<f64, FuncError> {
+    let v = n.as_f64();
+    if v.is_some() {
+        return Ok(v.unwrap());
+    }
+
+    let v = n.as_i64().map(|e| e as f64);
+    if v.is_some() {
+        return Ok(v.unwrap());
+    }
+
+    let v = n.as_i64().map(|e| e as f64);
+    if v.is_some() {
+        return Ok(v.unwrap());
+    }
+    Err(FuncError::UnableToConvertFromValue)
+}
+
 /// Function to return the current time, rounded to the nearest divisor
 /// The default divisor is 60 seconds
 fn func_time(args: &[gtmpl::Value]) -> Result<gtmpl::Value, FuncError> {
     HIDDEN_CONTEXT.with(|h| {
         let divisor = if args.len() > 0 {
             match args[0] {
-                gtmpl::Value::Number(ref n) => {
-                    n.as_f64().ok_or(FuncError::UnableToConvertFromValue)?
-                }
+                gtmpl::Value::Number(ref n) => gtmpl_number(n)?,
                 _ => {
                     return Err(FuncError::UnableToConvertFromValue);
                 }
@@ -219,7 +237,7 @@ mod test {
             "name": "world",
         }));
 
-        let template = Arc::new("Hello: {{ time }}".to_string());
+        let template = Arc::new("Hello: {{ time 60 }}".to_string());
 
         let now_sec = 3600 * 55 * 365 * 24;
         let now_next_min = now_sec + 60;
