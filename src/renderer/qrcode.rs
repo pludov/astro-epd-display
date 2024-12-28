@@ -341,10 +341,13 @@ mod tests {
                 width: 32,
                 height: 32,
             })],
-            Some(Size {
-                width: 32,
-                height: 32,
-            }),
+            Some(Rectangle::new(
+                embedded_graphics::prelude::Point { x: 0, y: 0 },
+                Size {
+                    width: 32,
+                    height: 32,
+                },
+            )),
         );
 
         assert_eq!(

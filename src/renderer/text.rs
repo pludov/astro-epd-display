@@ -92,10 +92,13 @@ mod tests {
                 color: Some("0".to_string()),
                 align: None,
             })],
-            Some(Size {
-                width: 81,
-                height: 12,
-            }),
+            Some(Rectangle::new(
+                embedded_graphics::prelude::Point { x: 0, y: 0 },
+                Size {
+                    width: 81,
+                    height: 12,
+                },
+            )),
         );
 
         assert_eq!(
@@ -125,10 +128,13 @@ mod tests {
                 color: Some("0".to_string()),
                 align: None,
             })],
-            Some(Size {
-                width: 81,
-                height: 12,
-            }),
+            Some(Rectangle::new(
+                embedded_graphics::prelude::Point { x: 0, y: 0 },
+                Size {
+                    width: 81,
+                    height: 12,
+                },
+            )),
         );
 
         assert_eq!(
@@ -158,10 +164,13 @@ mod tests {
                 color: Some("0".to_string()),
                 align: Some(Alignment::Center),
             })],
-            Some(Size {
-                width: 81,
-                height: 12,
-            }),
+            Some(Rectangle::new(
+                embedded_graphics::prelude::Point { x: 0, y: 0 },
+                Size {
+                    width: 81,
+                    height: 12,
+                },
+            )),
         );
 
         assert_eq!(

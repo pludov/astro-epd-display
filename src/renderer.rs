@@ -4,6 +4,7 @@ mod text;
 
 use crate::binary_framebuffer::{BinarisedColor, BinaryFrameBuffer};
 use crate::error::Error;
+use embedded_graphics::primitives::Rectangle;
 use embedded_graphics::{pixelcolor::BinaryColor, prelude::*};
 use qrcode::{draw_qrcode, QRCode};
 use serde::{Deserialize, Serialize};
@@ -119,28 +120,33 @@ fn map_ascii(a: u8, b: u8) -> char {
 
 pub fn to_display_string<C: BinarisedColor>(
     buffer: &BinaryFrameBuffer<C>,
-    bounds: Option<Size>,
+    bounds: Option<Rectangle>, // Bounds must be even for y
 ) -> String {
     let mut result = String::new();
     let width = buffer.width();
 
-    let bounds = bounds.unwrap_or(Size {
-        width: width,
-        height: buffer.height(),
-    });
+    let bounds = bounds.unwrap_or(Rectangle::new(
+        embedded_graphics::prelude::Point { x: 0, y: 0 },
+        Size {
+            width: buffer.width(),
+            height: buffer.height(),
+        },
+    ));
 
-    let get_pixel = |x: u32, y: u32| -> u8 {
-        let index = (y * width + x) as usize;
+    let get_pixel = |x: i32, y: i32| -> u8 {
+        let index = (y as u32 * width + x as u32) as usize;
 
         buffer.get_bit(index) as u8
     };
 
-    let maxx = bounds.width;
-    let maxy = bounds.height;
+    let minx = bounds.top_left.x;
+    let miny = bounds.top_left.y;
+    let maxx = minx + bounds.size.width as i32;
+    let maxy = miny + bounds.size.height as i32;
 
     // Iterator over two lines
-    for y in 0..maxy / 2 {
-        for x in 0..maxx {
+    for y in miny / 2..maxy / 2 {
+        for x in minx..maxx {
             let v1 = get_pixel(x, y * 2);
             let v2 = get_pixel(x, y * 2 + 1);
             result.push(map_ascii(v1, v2));
@@ -213,10 +219,13 @@ mod tests {
 
         let display = to_display_string(
             &buffer,
-            Some(Size {
-                width: 4,
-                height: 2,
-            }),
+            Some(Rectangle::new(
+                embedded_graphics::prelude::Point { x: 0, y: 0 },
+                Size {
+                    width: 4,
+                    height: 2,
+                },
+            )),
         );
         println!("{}", display);
 
@@ -228,7 +237,7 @@ mod tests {
         );
     }
 
-    pub fn render(size: Size, primitives: Vec<Primitive>, bounds: Option<Size>) -> String {
+    pub fn render(size: Size, primitives: Vec<Primitive>, bounds: Option<Rectangle>) -> String {
         let mut buffer = BinaryFrameBuffer::<BinaryColor>::new(size.width, size.height);
         let mut display = FrameBuf::<BinaryColor, &mut BinaryFrameBuffer<BinaryColor>>::new(
             &mut buffer,
