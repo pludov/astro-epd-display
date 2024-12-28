@@ -1,6 +1,7 @@
 mod alignment;
 mod image;
 mod positioning;
+mod progress;
 mod qrcode;
 mod text;
 
@@ -9,6 +10,7 @@ use crate::error::Error;
 use embedded_graphics::primitives::Rectangle;
 use embedded_graphics::{pixelcolor::BinaryColor, prelude::*};
 use image::{draw_image, Image};
+use progress::Progress;
 use qrcode::{draw_qrcode, QRCode};
 use serde::{Deserialize, Serialize};
 use text::{draw_text, TextItem};
@@ -62,6 +64,7 @@ pub enum Primitive {
     Text(TextItem),
     QRCode(QRCode),
     Image(Image),
+    Progress(Progress),
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -99,6 +102,9 @@ where
             Primitive::Text(text) => draw_text::<D, TargetColor>(display, text),
             Primitive::Image(image) => draw_image::<D, TargetColor>(display, image),
             Primitive::QRCode(qr) => draw_qrcode::<D, TargetColor>(display, qr),
+            Primitive::Progress(progress) => {
+                progress::draw_progress::<D, TargetColor>(display, progress)
+            }
         };
         if problem.is_err() {
             return Err(Error::DrawingError());

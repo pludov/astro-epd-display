@@ -35,7 +35,7 @@ where
     let bytes = &buf[..info.buffer_size()];
 
     if info.bit_depth != BitDepth::Eight {
-        // FIXME: error
+        println!("Unsupported bit depth: {:?}", info.bit_depth);
         return Ok(());
     }
 
@@ -100,8 +100,6 @@ where
     }
 
     display.draw_iter(pixels)?;
-
-    println!("{:?}", info);
 
     Ok(())
 }

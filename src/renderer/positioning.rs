@@ -19,6 +19,13 @@ pub enum HorizontalAlignment {
     Right,
 }
 
+#[derive(Debug, Copy, Clone, Ord, Serialize, Deserialize, PartialOrd, Eq, PartialEq, Hash)]
+#[serde(rename_all = "camelCase")]
+pub enum Direction {
+    Horizontal,
+    Vertical,
+}
+
 pub fn place_rectangle(
     s: Size,
     halign: Option<HorizontalAlignment>,

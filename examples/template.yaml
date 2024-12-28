@@ -10,7 +10,18 @@
 -
   text:
     value: "Running"
+    color: "1"
     position:
       x: 0
-      y: 20
+      y: 16
+-
+  progress:
+    position:
+      x: 0
+      y: 30
+    width: 60
+    height: 5
+    modulo: 120
+    threshold: 60
+    base: {{ ( time 1 ) }}
 {{ end }}
