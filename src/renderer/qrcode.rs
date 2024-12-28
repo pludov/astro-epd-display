@@ -383,7 +383,7 @@ mod tests {
             vec![Primitive::QRCode(QRCode {
                 value: "lés bon amis amös L3s €".to_string(),
                 position: Point { x: 4, y: 6 },
-                color: Some("0".to_string()),
+                color: Some("1".to_string()),
                 background: None,
                 ec_level: Some(::qrcode::EcLevel::L),
                 width: 82,

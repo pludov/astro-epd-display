@@ -192,12 +192,12 @@ fn render_template(
         .map_err(Into::into)
         .map_err(Error::TemplateError)?;
 
-    println!("render: yaml = {}", yaml);
+    // println!("render: yaml = {}", yaml);
 
     let raw_yaml = serde_yaml::from_str(&yaml).map_err(Error::SerdeYaml)?;
-    println!("render: raw_yaml = {:?}", raw_yaml);
+    // println!("render: raw_yaml = {:?}", raw_yaml);
     let merged_keys = merge_keys_serde(raw_yaml).map_err(Error::MergeKeyError)?;
-    println!("render: merged_yaml = {:?}", merged_keys);
+    // println!("render: merged_yaml = {:?}", merged_keys);
 
     let next = HIDDEN_CONTEXT.with(|h| {
         let ctx = h.borrow();
@@ -227,7 +227,13 @@ mod test {
 
         let (yaml, next) = render_template(template, state, now).unwrap();
 
-        assert_eq!(yaml, serde_yaml::Value::String("Hello, world!".to_string()));
+        let mut expected_map = serde_yaml::Mapping::new();
+        expected_map.insert(
+            serde_yaml::Value::String("Hello".to_string()),
+            serde_yaml::Value::String("world!".to_string()),
+        );
+
+        assert_eq!(yaml, serde_yaml::Value::Mapping(expected_map));
         assert_eq!(next, None);
     }
 
