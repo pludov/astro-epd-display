@@ -1,4 +1,6 @@
 mod alignment;
+mod image;
+mod positioning;
 mod qrcode;
 mod text;
 
@@ -6,6 +8,7 @@ use crate::binary_framebuffer::{BinarisedColor, BinaryFrameBuffer};
 use crate::error::Error;
 use embedded_graphics::primitives::Rectangle;
 use embedded_graphics::{pixelcolor::BinaryColor, prelude::*};
+use image::{draw_image, Image};
 use qrcode::{draw_qrcode, QRCode};
 use serde::{Deserialize, Serialize};
 use text::{draw_text, TextItem};
@@ -58,6 +61,7 @@ pub enum Primitive {
     Dummy(Dummy),
     Text(TextItem),
     QRCode(QRCode),
+    Image(Image),
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -93,6 +97,7 @@ where
         let problem = match primitive {
             Primitive::Dummy(_) => Ok(()),
             Primitive::Text(text) => draw_text::<D, TargetColor>(display, text),
+            Primitive::Image(image) => draw_image::<D, TargetColor>(display, image),
             Primitive::QRCode(qr) => draw_qrcode::<D, TargetColor>(display, qr),
         };
         if problem.is_err() {
