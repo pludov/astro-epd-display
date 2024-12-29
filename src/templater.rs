@@ -5,7 +5,7 @@ use axum::{
 };
 
 use gtmpl::{Context, FuncError, Template};
-use gtmpl_value::Number;
+use numeric::TmplToF64;
 use once_cell::sync::Lazy;
 use serde_json::Value;
 use std::{
@@ -17,6 +17,8 @@ use std::{
 use yaml_merge_keys::{merge_keys_serde, serde_yaml};
 
 use crate::{error::Error, state::get_state, trigger_draw};
+mod arithmetic;
+mod numeric;
 
 static TEMPLATE: Lazy<Mutex<Arc<String>>> = Lazy::new(|| Mutex::new(Arc::new("".to_string())));
 
@@ -115,36 +117,12 @@ pub fn render(
     render_template(template, state, now)
 }
 
-// Return a f64 from a gtmpl value
-fn gtmpl_number(n: &Number) -> Result<f64, FuncError> {
-    let v = n.as_f64();
-    if v.is_some() {
-        return Ok(v.unwrap());
-    }
-
-    let v = n.as_i64().map(|e| e as f64);
-    if v.is_some() {
-        return Ok(v.unwrap());
-    }
-
-    let v = n.as_i64().map(|e| e as f64);
-    if v.is_some() {
-        return Ok(v.unwrap());
-    }
-    Err(FuncError::UnableToConvertFromValue)
-}
-
 /// Function to return the current time, rounded to the nearest divisor
 /// The default divisor is 60 seconds
 fn func_time(args: &[gtmpl::Value]) -> Result<gtmpl::Value, FuncError> {
     HIDDEN_CONTEXT.with(|h| {
         let divisor = if args.len() > 0 {
-            match args[0] {
-                gtmpl::Value::Number(ref n) => gtmpl_number(n)?,
-                _ => {
-                    return Err(FuncError::UnableToConvertFromValue);
-                }
-            }
+            args[0].to_float()?
         } else {
             60.0
         };
@@ -183,6 +161,7 @@ fn render_template(
 
     let mut tmpl = Template::default();
     tmpl.add_func("time", func_time);
+    tmpl.add_funcs(&arithmetic::funcs());
     tmpl.parse((*template).clone())
         .map_err(Into::into)
         .map_err(Error::TemplateError)?;
