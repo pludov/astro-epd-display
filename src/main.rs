@@ -13,8 +13,11 @@ mod templater;
 use axum::{response::Html, routing::get, Router};
 use clap::Parser;
 use cli::Args;
+use serde_json::json;
+use tokio::{select, signal};
 
 use std::net::SocketAddr;
+use std::sync::mpsc::TrySendError;
 use std::{
     cell::RefCell,
     sync::mpsc::{Receiver, SyncSender},
@@ -93,7 +96,15 @@ pub fn trigger_draw() {
             return;
         }
         Some(sender) => {
-            sender.try_send(()).unwrap();
+            match sender.try_send(()) {
+                Ok(_) => {}
+                Err(TrySendError::Full(_)) => {
+                    println!("Draw signal already sent");
+                }
+                Err(e) => {
+                    panic!("Error sending draw signal: {:?}", e);
+                }
+            };
         }
     });
 }
@@ -114,8 +125,20 @@ async fn run_server(sender: SyncSender<()>) {
     let app = state::route(app);
     let app = templater::route(app);
     let app = debug::route(app);
-    axum::serve(listener, app).await.unwrap();
+
+    select! {
+        _ = signal::ctrl_c() => {
+            println!("Shutting down");
+        }
+        r = axum::serve(listener, app) => {
+            r.unwrap();
+            println!("Server stopped by itself ?");
+        }
+    }
+    // FIXME: now adjust the
     sender.try_send(()).unwrap();
+
+    state::merge_state(json!({"status": "done"})).unwrap();
 
     DRAW_SIGNAL.with(|signal| {
         signal.replace(None);
@@ -153,7 +176,7 @@ async fn main() {
 
     let (sender, receiver) = std::sync::mpsc::sync_channel::<()>(1);
 
-    std::thread::spawn({
+    let driver = std::thread::spawn({
         let args = args.clone();
         move || {
             run_device(receiver, &args);
@@ -164,4 +187,5 @@ async fn main() {
     local
         .run_until(async move { run_server(sender).await })
         .await;
+    driver.join().unwrap();
 }

@@ -68,7 +68,7 @@ pub fn drive_device(device: &mut dyn Device, signal: Receiver<()>) {
 
     change_tracker.reset(&buffer, &mut previous);
 
-    loop {
+    'driver: loop {
         let state = state::get_state();
         // FIXME: this render must produce a buffer, the buffer must be compared, then only
         // the redraw must be done
@@ -139,10 +139,11 @@ pub fn drive_device(device: &mut dyn Device, signal: Receiver<()>) {
                     continue;
                 }
                 Err(RecvTimeoutError::Disconnected) => {
-                    break;
+                    println!("Signal disconnected");
+                    break 'driver;
                 }
                 Ok(_) => {
-                    // Signal received, do nothing
+                    // Signal received, go directly to redraw
                     println!("Signal received");
                     break;
                 }

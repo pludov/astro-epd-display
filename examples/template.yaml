@@ -18,10 +18,20 @@
   progress:
     position:
       x: 0
-      y: 30
+      y: 46
     width: 60
     height: 5
     modulo: 120
     threshold: 60
     base: {{ ( time 1 ) }}
+{{ end }}
+
+{{ if .status }}
+-
+  text:
+    value: "Status: {{ .status }}"
+    position:
+      x: 0
+      y: 32
+    color: "1"
 {{ end }}

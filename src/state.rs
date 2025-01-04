@@ -6,7 +6,10 @@ use axum::{
 
 use once_cell::sync::Lazy;
 use serde_json::{Map, Number, Value};
-use std::{borrow::Borrow, sync::{Arc, Mutex}};
+use std::{
+    borrow::Borrow,
+    sync::{Arc, Mutex},
+};
 
 use crate::trigger_draw;
 
@@ -27,37 +30,34 @@ enum Error {
 }
 
 // Value2 replaces value1 in case of conflict
-fn deep_merge(value1: &Value, value2: &Value) -> Value
-{
+fn deep_merge(value1: &Value, value2: &Value) -> Value {
     match value2 {
         Value::Null => value2.clone(),
         Value::Bool(_) => value2.clone(),
         Value::Number(_) => value2.clone(),
         Value::String(_) => value2.clone(),
-        Value::Array(arr2) => {
-            match value1 {
-                Value::Array(arr1) => {
-                    let mut outvec = Vec::new();
-                    for i in 0..arr2.len() {
-
-                        if i < arr1.len() {
-                            outvec.push(deep_merge(&arr1[i], &arr2[i]));
-                        } else {
-                            outvec.push(arr2[i].clone());
-                        }
+        Value::Array(arr2) => match value1 {
+            Value::Array(arr1) => {
+                let mut outvec = Vec::new();
+                for i in 0..arr2.len() {
+                    if i < arr1.len() {
+                        outvec.push(deep_merge(&arr1[i], &arr2[i]));
+                    } else {
+                        outvec.push(arr2[i].clone());
                     }
-                    Value::Array(outvec)
                 }
-                _ => Value::Array(arr2.clone()),
+                Value::Array(outvec)
             }
-        }
+            _ => Value::Array(arr2.clone()),
+        },
         Value::Object(map2) => {
             match value1 {
                 Value::Object(map1) => {
                     let mut outmap = Map::new();
                     // Create a set from map2 keys
                     let map2keys: Vec<String> = map2.keys().cloned().collect();
-                    let map2keys: std::collections::HashSet<String> = map2keys.into_iter().collect();
+                    let map2keys: std::collections::HashSet<String> =
+                        map2keys.into_iter().collect();
 
                     for (key, value) in map2 {
                         if map1.contains_key(key) {
@@ -74,11 +74,10 @@ fn deep_merge(value1: &Value, value2: &Value) -> Value
                     }
                     Value::Object(outmap)
                 }
-                _ => Value::Object(map2.clone())
+                _ => Value::Object(map2.clone()),
             }
         }
     }
-
 }
 
 // This ensures that all numbers are f64, as implied by JSON RFC 7159
@@ -132,12 +131,15 @@ async fn get_root() -> Json<Value> {
     Json((*get_state()).clone())
 }
 
-
 async fn post_root(payload: Json<Value>) -> Result<(), (StatusCode, String)> {
+    merge_state(payload.0)
+}
+
+pub fn merge_state(payload: Value) -> Result<(), (StatusCode, String)> {
     let mut state = STATE.lock().unwrap();
     // Do a deep merge of the state and the payload.
-    
-    let payload = cleanup(payload.0).or_else(handle_error)?;
+
+    let payload = cleanup(payload).or_else(handle_error)?;
 
     state.root = Arc::new(deep_merge(state.root.borrow(), &payload));
 
