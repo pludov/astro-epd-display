@@ -15,6 +15,7 @@ struct EpdDevice {
     epd4in2: Epd2in9<SpidevDevice, CdevPin, CdevPin, CdevPin, Delay>,
     spi: SpidevDevice,
     delay: Delay,
+    reset: bool,
 }
 
 impl Device for EpdDevice {
@@ -29,29 +30,49 @@ impl Device for EpdDevice {
     fn sleep(&mut self) -> Result<(), Error> {
         self.epd4in2
             .sleep(&mut self.spi, &mut self.delay)
-            .map_err(|e| Error::HWError(format!("SPI error{:?}", e)))
+            .map_err(|e| Error::HWError(format!("SPI error{:?}", e)))?;
+        Ok(())
     }
 
     fn wake_up(&mut self) -> Result<(), Error> {
         self.epd4in2
             .wake_up(&mut self.spi, &mut self.delay)
-            .map_err(|e| Error::HWError(format!("SPI error{:?}", e)))
+            .map_err(|e| Error::HWError(format!("SPI error{:?}", e)))?;
+        Ok(())
     }
 
     fn update(&mut self, buffer: &[u8]) -> Result<(), Error> {
+        if self.reset {
+            println!("setting full lut\n");
+            self.epd4in2
+                .set_lut(&mut self.spi, &mut self.delay, Some(RefreshLut::Full))
+                .map_err(|e| Error::HWError(format!("SPI error{:?}", e)))?;
+        }
+
+        // let (w, h) = (self.width(), self.height());
         self.epd4in2
             .update_frame(&mut self.spi, buffer, &mut self.delay)
             .map_err(|e| Error::HWError(format!("SPI error{:?}", e)))?;
         self.epd4in2
             .display_frame(&mut self.spi, &mut self.delay)
-            .map_err(|e| Error::HWError(format!("SPI error{:?}", e)))
+            .map_err(|e| Error::HWError(format!("SPI error{:?}", e)))?;
+
+        if self.reset {
+            println!("setting quick lut\n");
+            self.epd4in2
+                .set_lut(&mut self.spi, &mut self.delay, Some(RefreshLut::Quick))
+                .map_err(|e| Error::HWError(format!("SPI error{:?}", e)))?;
+            self.reset = false;
+        }
+
+        Ok(())
     }
 }
 
 pub fn drive_epd(signal: Receiver<()>) {
     let mut chip = Chip::new("/dev/gpiochip4").unwrap();
 
-    let mut spi = SpidevDevice::open("/dev/spidev0.0").unwrap();
+    let mut spi = SpidevDevice::open("/dev/spidev1.0").unwrap();
     spi.configure(
         &SpidevOptions::new()
             .bits_per_word(8)
@@ -68,7 +89,7 @@ pub fn drive_epd(signal: Receiver<()>) {
     )
     .unwrap();
     let rst = CdevPin::new(
-        chip.get_line(17)
+        chip.get_line(23)
             .unwrap()
             .request(LineRequestFlags::OUTPUT, 0, "rst")
             .unwrap(),
@@ -82,16 +103,17 @@ pub fn drive_epd(signal: Receiver<()>) {
             .unwrap(),
     )
     .unwrap();
-    let power = CdevPin::new(
+
+    /*let power = CdevPin::new(
         chip.get_line(18)
             .unwrap()
             .request(LineRequestFlags::OUTPUT, 0, "power")
             .unwrap(),
     )
-    .unwrap();
+    .unwrap();*/
 
     let mut delay = Delay {};
-    power.set_value(1).unwrap();
+    // power.set_value(1).unwrap();
     println!("creating new epd\n");
     rst.set_value(1).unwrap();
     delay.delay_ms(200);
@@ -107,6 +129,7 @@ pub fn drive_epd(signal: Receiver<()>) {
         epd4in2,
         spi,
         delay,
+        reset: true,
     };
     drive_device(&mut epd_device, signal)
 
