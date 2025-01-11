@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::Parser;
 
 #[derive(clap::ValueEnum, Default, Clone, Debug)]
@@ -12,6 +14,12 @@ pub enum Driver {
 pub struct Args {
     #[arg(short, long, default_value = "stdout")]
     pub driver: Driver,
+
+    #[arg(short, long, help = "Path to template")]
+    pub template: Option<PathBuf>,
+
+    #[arg(short, long, default_value = "3000", help = "Port for http server")]
+    pub port: u16,
 
     #[arg(long, default_value = "128")]
     pub width: u32,

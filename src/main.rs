@@ -109,8 +109,8 @@ pub fn trigger_draw() {
     });
 }
 
-async fn run_server(sender: SyncSender<()>) {
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+async fn run_server(sender: SyncSender<()>, port: u16) {
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
 
     DRAW_SIGNAL.with(|signal| {
         signal.replace(Some(sender.clone()));
@@ -170,9 +170,23 @@ fn run_device(receiver: Receiver<()>, args: &Args) {
     }
 }
 
+async fn load_default_template(args: &Args) {
+    if let Some(template) = &args.template {
+        let template = tokio::fs::read_to_string(template)
+            .await
+            .expect(format!("Error loading template: {:?}", template).as_str());
+
+        templater::post_template(template)
+            .await
+            .expect("Error installing default template");
+    }
+}
+
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let args = Args::parse();
+
+    load_default_template(&args).await;
 
     let (sender, receiver) = std::sync::mpsc::sync_channel::<()>(1);
 
@@ -185,7 +199,7 @@ async fn main() {
 
     let local = task::LocalSet::new();
     local
-        .run_until(async move { run_server(sender).await })
+        .run_until(async move { run_server(sender, args.port).await })
         .await;
     driver.join().unwrap();
 }

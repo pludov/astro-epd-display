@@ -5,7 +5,7 @@ use axum::{
 };
 
 use once_cell::sync::Lazy;
-use serde_json::{Map, Number, Value};
+use serde_json::{json, Map, Number, Value};
 use std::{
     borrow::Borrow,
     sync::{Arc, Mutex},
@@ -20,7 +20,7 @@ struct State {
 
 static STATE: Lazy<Mutex<State>> = Lazy::new(|| {
     Mutex::new(State {
-        root: Arc::new(Value::Null),
+        root: Arc::new(json!({})),
     })
 });
 
