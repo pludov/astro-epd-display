@@ -1,7 +1,9 @@
 use crate::{
-    device_driver::{drive_device, Device},
+    cli::EpdConfig,
+    device_driver::{drive_device, Device, RefreshSignal},
     error::Error,
 };
+use embedded_graphics::primitives::Rectangle;
 use embedded_hal::delay::DelayNs;
 use epd_waveshare::{epd2in9_v2::Epd2in9, prelude::*};
 use linux_embedded_hal::{
@@ -15,7 +17,55 @@ struct EpdDevice {
     epd4in2: Epd2in9<SpidevDevice, CdevPin, CdevPin, CdevPin, Delay>,
     spi: SpidevDevice,
     delay: Delay,
-    reset: bool,
+    // Does the device still has in memory the current frame
+    memory_content: bool,
+    // Last rendered frame. Required for partial update
+    current_frame: Option<Box<Vec<u8>>>,
+    max_partial: u8,
+    cur_partial: u8,
+}
+
+impl EpdDevice {
+    fn internal_update(&mut self, buffer: &[u8], full: bool) -> Result<(), Error> {
+        // Inverse the buffer so default is white
+        let new_frame: Box<Vec<u8>> = Box::new(buffer.iter().map(|x| !x).collect());
+        // FIXME: rotate
+
+        if !full && self.current_frame.is_some() && self.cur_partial < self.max_partial {
+            if !self.memory_content {
+                self.epd4in2
+                    .update_old_frame(
+                        &mut self.spi,
+                        &*self.current_frame.as_ref().unwrap(),
+                        &mut self.delay,
+                    )
+                    .map_err(|e| Error::HWError(format!("SPI error{:?}", e)))?;
+
+                self.memory_content = true;
+            }
+            self.epd4in2
+                .update_new_frame(&mut self.spi, &*new_frame, &mut self.delay)
+                .map_err(|e| Error::HWError(format!("SPI error{:?}", e)))?;
+
+            self.epd4in2
+                .display_new_frame(&mut self.spi, &mut self.delay)
+                .map_err(|e| Error::HWError(format!("SPI error{:?}", e)))?;
+
+            self.cur_partial += 1;
+        } else {
+            // let (w, h) = (self.width(), self.height());
+            self.epd4in2
+                .update_frame(&mut self.spi, &*new_frame, &mut self.delay)
+                .map_err(|e| Error::HWError(format!("SPI error{:?}", e)))?;
+            self.epd4in2
+                .display_frame(&mut self.spi, &mut self.delay)
+                .map_err(|e| Error::HWError(format!("SPI error{:?}", e)))?;
+            self.memory_content = false;
+            self.cur_partial = 0;
+        }
+        self.current_frame = Some(new_frame);
+        Ok(())
+    }
 }
 
 impl Device for EpdDevice {
@@ -38,42 +88,20 @@ impl Device for EpdDevice {
         self.epd4in2
             .wake_up(&mut self.spi, &mut self.delay)
             .map_err(|e| Error::HWError(format!("SPI error{:?}", e)))?;
+        self.memory_content = false;
         Ok(())
+    }
+
+    fn partial_update(&mut self, buffer: &[u8], _rects: &Vec<Rectangle>) -> Result<(), Error> {
+        self.internal_update(buffer, false)
     }
 
     fn update(&mut self, buffer: &[u8]) -> Result<(), Error> {
-        // if self.reset {
-        //     println!("setting full lut\n");
-        //     self.epd4in2
-        //         .set_lut(&mut self.spi, &mut self.delay, Some(RefreshLut::Full))
-        //         .map_err(|e| Error::HWError(format!("SPI error{:?}", e)))?;
-        // }
-
-        // Inverse the buffer so default is white
-        let inv_buff: Vec<u8> = buffer.iter().map(|x| !x).collect();
-        // FIXME: rotate
-
-        // let (w, h) = (self.width(), self.height());
-        self.epd4in2
-            .update_frame(&mut self.spi, &inv_buff, &mut self.delay)
-            .map_err(|e| Error::HWError(format!("SPI error{:?}", e)))?;
-        self.epd4in2
-            .display_frame(&mut self.spi, &mut self.delay)
-            .map_err(|e| Error::HWError(format!("SPI error{:?}", e)))?;
-
-        //        if self.reset {
-        //            println!("setting quick lut\n");
-        //            self.epd4in2
-        //                .set_lut(&mut self.spi, &mut self.delay, Some(RefreshLut::Quick))
-        //                .map_err(|e| Error::HWError(format!("SPI error{:?}", e)))?;
-        //            self.reset = false;
-        //        }
-
-        Ok(())
+        self.internal_update(buffer, true)
     }
 }
 
-pub fn drive_epd(signal: Receiver<()>) {
+pub fn drive_epd(signal: Receiver<RefreshSignal>, config: &EpdConfig) {
     let mut chip = Chip::new("/dev/gpiochip4").unwrap();
 
     let mut spi = SpidevDevice::open("/dev/spidev1.0").unwrap();
@@ -133,9 +161,12 @@ pub fn drive_epd(signal: Receiver<()>) {
         epd4in2,
         spi,
         delay,
-        reset: true,
+        memory_content: false,
+        current_frame: None,
+        max_partial: config.max_partial_per_pixel,
+        cur_partial: 0,
     };
-    drive_device(&mut epd_device, signal)
+    drive_device(&mut epd_device, signal, config.max_partial_per_pixel);
 
     // let size = Size{width: epd4in2.width(), height: epd4in2.height()};
     // println!("Size: {size}\n");

@@ -39,6 +39,11 @@ fn render<Color: PixelColor + BinarisedColor + ColorFromTemplate + Default>(
     Ok(next)
 }
 
+pub enum RefreshSignal {
+    Normal,
+    Full,
+}
+
 pub trait Device {
     fn width(&self) -> u32;
     fn height(&self) -> u32;
@@ -52,7 +57,11 @@ pub trait Device {
 }
 
 // This runs a thread
-pub fn drive_device(device: &mut dyn Device, signal: Receiver<()>) {
+pub fn drive_device(
+    device: &mut dyn Device,
+    signal: Receiver<RefreshSignal>,
+    max_partial_per_pixel: u8,
+) {
     let size = Size {
         width: device.width(),
         height: device.height(),
@@ -89,7 +98,7 @@ pub fn drive_device(device: &mut dyn Device, signal: Receiver<()>) {
                     asleep = false;
                 }
 
-                if change_tracker.get_max_changes() > 128 {
+                if change_tracker.get_max_changes() > max_partial_per_pixel {
                     force_full_render = true;
                 }
 
@@ -141,10 +150,27 @@ pub fn drive_device(device: &mut dyn Device, signal: Receiver<()>) {
                     println!("Signal disconnected");
                     break 'driver;
                 }
-                Ok(_) => {
-                    // Signal received, go directly to redraw
+                Ok(RefreshSignal::Normal) => {
                     println!("Signal received");
                     break;
+                }
+                Ok(RefreshSignal::Full) => {
+                    force_full_render = true;
+                    println!("Full signal received");
+                    break;
+                }
+            }
+        }
+
+        // Fetch more pending signals
+        while let Ok(s) = signal.try_recv() {
+            match s {
+                RefreshSignal::Normal => {
+                    println!("Signal dequeud");
+                }
+                RefreshSignal::Full => {
+                    force_full_render = true;
+                    println!("Full Signal dequeud");
                 }
             }
         }

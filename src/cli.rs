@@ -1,10 +1,20 @@
 use std::path::PathBuf;
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 
-#[derive(clap::ValueEnum, Default, Clone, Debug)]
+#[derive(Parser, Debug, Clone)]
+pub struct EpdConfig {
+    #[arg(
+        long,
+        default_value = "6",
+        help = "Max number of refresh per pixel before a full upgrade is triggered"
+    )]
+    pub max_partial_per_pixel: u8,
+}
+
+#[derive(Subcommand, Default, Clone, Debug)]
 pub enum Driver {
-    Epd,
+    Epd(EpdConfig),
     #[default]
     Stdout,
 }
@@ -12,8 +22,8 @@ pub enum Driver {
 #[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
-    #[arg(short, long, default_value = "stdout")]
-    pub driver: Driver,
+    #[command(subcommand)]
+    pub driver: Option<Driver>,
 
     #[arg(short, long, help = "Path to template")]
     pub template: Option<PathBuf>,

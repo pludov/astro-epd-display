@@ -1,6 +1,6 @@
 use crate::{
     binary_framebuffer::BinaryFrameBuffer,
-    device_driver::{drive_device, Device},
+    device_driver::{drive_device, Device, RefreshSignal},
     error::Error,
     renderer::to_display_string,
 };
@@ -108,10 +108,10 @@ impl Device for StdoutDevice {
     }
 }
 
-pub fn drive_stdout(signal: Receiver<()>, width: u32, height: u32) {
+pub fn drive_stdout(signal: Receiver<RefreshSignal>, width: u32, height: u32) {
     let mut device = StdoutDevice {
         buffer: BinaryFrameBuffer::<BinaryColor>::new(width, height),
     };
 
-    drive_device(&mut device, signal)
+    drive_device(&mut device, signal, 255)
 }

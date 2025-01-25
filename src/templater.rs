@@ -16,7 +16,7 @@ use std::{
 };
 use yaml_merge_keys::{merge_keys_serde, serde_yaml};
 
-use crate::{error::Error, state::get_state, trigger_draw};
+use crate::{device_driver::RefreshSignal, error::Error, state::get_state, trigger_draw};
 mod arithmetic;
 mod numeric;
 
@@ -82,7 +82,7 @@ pub async fn post_template(payload: String) -> Result<(), (StatusCode, String)> 
 
     *template = Arc::new(payload);
 
-    trigger_draw();
+    trigger_draw(RefreshSignal::Normal);
     Ok(())
 }
 

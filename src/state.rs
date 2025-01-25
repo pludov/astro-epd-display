@@ -11,7 +11,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::trigger_draw;
+use crate::{device_driver::RefreshSignal, trigger_draw};
 
 #[derive(Debug)]
 struct State {
@@ -132,10 +132,10 @@ async fn get_root() -> Json<Value> {
 }
 
 async fn post_root(payload: Json<Value>) -> Result<(), (StatusCode, String)> {
-    merge_state(payload.0)
+    merge_state(payload.0, RefreshSignal::Normal)
 }
 
-pub fn merge_state(payload: Value) -> Result<(), (StatusCode, String)> {
+pub fn merge_state(payload: Value, signal: RefreshSignal) -> Result<(), (StatusCode, String)> {
     let mut state = STATE.lock().unwrap();
     // Do a deep merge of the state and the payload.
 
@@ -143,7 +143,7 @@ pub fn merge_state(payload: Value) -> Result<(), (StatusCode, String)> {
 
     state.root = Arc::new(deep_merge(state.root.borrow(), &payload));
 
-    trigger_draw();
+    trigger_draw(signal);
     Ok(())
 }
 

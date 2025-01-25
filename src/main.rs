@@ -13,16 +13,14 @@ mod templater;
 use axum::{response::Html, routing::get, Router};
 use clap::Parser;
 use cli::Args;
+use device_driver::RefreshSignal;
 use serde_json::json;
+use std::sync::mpsc::{Receiver, Sender};
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::{select, signal};
 
+use std::cell::RefCell;
 use std::net::SocketAddr;
-use std::sync::mpsc::TrySendError;
-use std::{
-    cell::RefCell,
-    sync::mpsc::{Receiver, SyncSender},
-};
 use std::{panic, process};
 
 use tokio::{net::TcpListener, task};
@@ -89,20 +87,17 @@ use tokio::{net::TcpListener, task};
 // }
 
 thread_local! {
-    static DRAW_SIGNAL: RefCell<Option<SyncSender<()>>> = RefCell::new(None);
+    static DRAW_SIGNAL: RefCell<Option<Sender<RefreshSignal>>> = RefCell::new(None);
 }
 
-pub fn trigger_draw() {
+pub fn trigger_draw(kind: RefreshSignal) {
     DRAW_SIGNAL.with(|cell| match cell.borrow().clone() {
         None => {
             return;
         }
         Some(sender) => {
-            match sender.try_send(()) {
+            match sender.send(kind) {
                 Ok(_) => {}
-                Err(TrySendError::Full(_)) => {
-                    println!("Draw signal already sent");
-                }
                 Err(e) => {
                     panic!("Error sending draw signal: {:?}", e);
                 }
@@ -111,7 +106,7 @@ pub fn trigger_draw() {
     });
 }
 
-async fn run_server(sender: SyncSender<()>, port: u16) {
+async fn run_server(sender: Sender<RefreshSignal>, port: u16) {
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
 
     DRAW_SIGNAL.with(|signal| {
@@ -142,7 +137,7 @@ async fn run_server(sender: SyncSender<()>, port: u16) {
         }
     }
     // FIXME: now adjust the
-    state::merge_state(json!({"status": "done"})).unwrap();
+    state::merge_state(json!({"status": "done"}), RefreshSignal::Full).unwrap();
 
     DRAW_SIGNAL.with(|signal| {
         signal.replace(None);
@@ -167,10 +162,12 @@ async fn root() -> Html<&'static str> {
     )
 }
 
-fn run_device(receiver: Receiver<()>, args: &Args) {
-    match args.driver {
-        cli::Driver::Epd => epd_driver::drive_epd(receiver),
-        cli::Driver::Stdout => stdout_driver::drive_stdout(receiver, args.width, args.height),
+fn run_device(receiver: Receiver<RefreshSignal>, args: &Args) {
+    match args.driver.clone() {
+        Some(cli::Driver::Epd(epd_config)) => epd_driver::drive_epd(receiver, &epd_config),
+        None | Some(cli::Driver::Stdout) => {
+            stdout_driver::drive_stdout(receiver, args.width, args.height)
+        }
     }
 }
 
@@ -200,7 +197,7 @@ async fn main() {
 
     load_default_template(&args).await;
 
-    let (sender, receiver) = std::sync::mpsc::sync_channel::<()>(1);
+    let (sender, receiver) = std::sync::mpsc::channel::<RefreshSignal>();
 
     let driver = std::thread::spawn({
         let args = args.clone();
