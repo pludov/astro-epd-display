@@ -96,7 +96,6 @@ pub fn drive_device(device: &mut dyn Device, signal: Receiver<()>) {
                 if force_full_render {
                     device.update(buffer.buffer()).unwrap();
                 } else {
-                    println!("Partial update: {:?}", changed_rects);
                     device
                         .partial_update(buffer.buffer(), &changed_rects)
                         .unwrap();
@@ -150,6 +149,12 @@ pub fn drive_device(device: &mut dyn Device, signal: Receiver<()>) {
             }
         }
     }
+
+    if !asleep {
+        device.sleep().expect("sleep failed");
+    }
+
+    println!("Device driver stopped");
     //     // Setup the graphics
     // let mut display = Display2in9::default();
 

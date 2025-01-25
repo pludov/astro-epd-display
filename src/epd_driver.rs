@@ -3,7 +3,7 @@ use crate::{
     error::Error,
 };
 use embedded_hal::delay::DelayNs;
-use epd_waveshare::{epd2in9::Epd2in9, prelude::*};
+use epd_waveshare::{epd2in9_v2::Epd2in9, prelude::*};
 use linux_embedded_hal::{
     gpio_cdev::{Chip, LineRequestFlags},
     spidev::{SpiModeFlags, SpidevOptions},
@@ -42,28 +42,32 @@ impl Device for EpdDevice {
     }
 
     fn update(&mut self, buffer: &[u8]) -> Result<(), Error> {
-        if self.reset {
-            println!("setting full lut\n");
-            self.epd4in2
-                .set_lut(&mut self.spi, &mut self.delay, Some(RefreshLut::Full))
-                .map_err(|e| Error::HWError(format!("SPI error{:?}", e)))?;
-        }
+        // if self.reset {
+        //     println!("setting full lut\n");
+        //     self.epd4in2
+        //         .set_lut(&mut self.spi, &mut self.delay, Some(RefreshLut::Full))
+        //         .map_err(|e| Error::HWError(format!("SPI error{:?}", e)))?;
+        // }
+
+        // Inverse the buffer so default is white
+        let inv_buff: Vec<u8> = buffer.iter().map(|x| !x).collect();
+        // FIXME: rotate
 
         // let (w, h) = (self.width(), self.height());
         self.epd4in2
-            .update_frame(&mut self.spi, buffer, &mut self.delay)
+            .update_frame(&mut self.spi, &inv_buff, &mut self.delay)
             .map_err(|e| Error::HWError(format!("SPI error{:?}", e)))?;
         self.epd4in2
             .display_frame(&mut self.spi, &mut self.delay)
             .map_err(|e| Error::HWError(format!("SPI error{:?}", e)))?;
 
-        if self.reset {
-            println!("setting quick lut\n");
-            self.epd4in2
-                .set_lut(&mut self.spi, &mut self.delay, Some(RefreshLut::Quick))
-                .map_err(|e| Error::HWError(format!("SPI error{:?}", e)))?;
-            self.reset = false;
-        }
+        //        if self.reset {
+        //            println!("setting quick lut\n");
+        //            self.epd4in2
+        //                .set_lut(&mut self.spi, &mut self.delay, Some(RefreshLut::Quick))
+        //                .map_err(|e| Error::HWError(format!("SPI error{:?}", e)))?;
+        //            self.reset = false;
+        //        }
 
         Ok(())
     }

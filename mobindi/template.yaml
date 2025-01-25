@@ -1,0 +1,40 @@
+{{ $width := 128 }}
+{{ $height := 296 }}
+{{ $freq := 240 }}
+{{ if eq .status "done" }}
+
+{{ else }}
+{{  if ( not .running ) }}
+-
+  text:
+    value: "Starting !"
+    font: "9X18_BOLD"
+    position:
+      x: {{ div $width 2 }}
+      y: 10
+    color: "1"
+    align: "center"
+-
+  text:
+    value: "Elapsed {{ ( time 60 ) }}"
+    font: "9X18_BOLD"
+    position:
+      x: {{ div $width 2 }}
+      y: 46
+    color: "1"
+    align: "center"
+
+{{ end }}
+{{ if .running }}
+-
+  text:
+    value: "Running"
+    font: "9X18_BOLD"
+    position:
+      x: {{ (round (add (div $width  4) (mod (mul (div (time $freq) $freq ) 1889) (div $width  2)) ) ) }}
+      y: {{ (round (add (div $height 4) (mod (mul (div (time $freq) $freq ) 1979) (div $height 2)) ) ) }}
+    color: "1"
+    align: "center"
+{{ end }}
+
+{{ end }}
