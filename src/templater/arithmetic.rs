@@ -20,8 +20,46 @@ fn func_sub(args: &[gtmpl::Value]) -> Result<gtmpl::Value, FuncError> {
     Ok(result.to_tmpl())
 }
 
+fn func_div(args: &[gtmpl::Value]) -> Result<gtmpl::Value, FuncError> {
+    let mut result = args[0].to_float()?;
+    for a in &args[1..] {
+        result /= a.to_float()?;
+    }
+
+    Ok(result.to_tmpl())
+}
+fn func_mul(args: &[gtmpl::Value]) -> Result<gtmpl::Value, FuncError> {
+    let mut result = args[0].to_float()?;
+    for a in &args[1..] {
+        result *= a.to_float()?;
+    }
+
+    Ok(result.to_tmpl())
+}
+
+fn func_mod(args: &[gtmpl::Value]) -> Result<gtmpl::Value, FuncError> {
+    let mut result = args[0].to_float()?;
+    for a in &args[1..] {
+        result %= a.to_float()?;
+    }
+
+    Ok(result.to_tmpl())
+}
+
+fn func_round(args: &[gtmpl::Value]) -> Result<gtmpl::Value, FuncError> {
+    let v = args[0].to_float()?;
+    Ok(v.round().to_tmpl())
+}
+
 pub fn funcs() -> Vec<(&'static str, Func)> {
-    vec![("add", func_add), ("sub", func_sub)]
+    vec![
+        ("add", func_add),
+        ("sub", func_sub),
+        ("div", func_div),
+        ("mul", func_mul),
+        ("mod", func_mod),
+        ("round", func_round),
+    ]
 }
 
 #[cfg(test)]
@@ -71,5 +109,23 @@ mod test {
         );
         // Float
         assert_eq!(render(r#"{{ sub 1.1 2.2 3.3 }}"#, Value::NoValue), "-4.4");
+    }
+
+    #[test]
+    fn test_mod() {
+        assert_eq!(render(r#"{{ mod 1 2 }}"#, Value::NoValue), "1");
+        assert_eq!(render(r#"{{ mod 1.2 2.4 }}"#, Value::NoValue), "1.2");
+        // 32 bits int overflow
+        assert_eq!(render(r#"{{ mod 4294967295 1 }}"#, Value::NoValue), "0");
+        // Float
+        assert_eq!(render(r#"{{ mod 1.1 2.2 }}"#, Value::NoValue), "1.1");
+    }
+    #[test]
+    fn test_round_fn() {
+        assert_eq!(render(r#"{{ round 1.1 }}"#, Value::NoValue), "1");
+        assert_eq!(render(r#"{{ round 1.5 }}"#, Value::NoValue), "2");
+        assert_eq!(render(r#"{{ round 1.6 }}"#, Value::NoValue), "2");
+        assert_eq!(render(r#"{{ round 1.9 }}"#, Value::NoValue), "2");
+        assert_eq!(render(r#"{{ round -1.2 }}"#, Value::NoValue), "-1");
     }
 }
