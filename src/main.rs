@@ -14,6 +14,7 @@ use axum::{response::Html, routing::get, Router};
 use clap::Parser;
 use cli::Args;
 use serde_json::json;
+use tokio::signal::unix::{signal, SignalKind};
 use tokio::{select, signal};
 
 use std::net::SocketAddr;
@@ -22,6 +23,7 @@ use std::{
     cell::RefCell,
     sync::mpsc::{Receiver, SyncSender},
 };
+use std::{panic, process};
 
 use tokio::{net::TcpListener, task};
 
@@ -126,9 +128,13 @@ async fn run_server(sender: SyncSender<()>, port: u16) {
     let app = templater::route(app);
     let app = debug::route(app);
 
+    let mut sigint = signal(SignalKind::terminate()).unwrap();
     select! {
         _ = signal::ctrl_c() => {
             println!("Shutting down");
+        }
+        _ = sigint.recv() => {
+            println!("Shutting down from sigterm");
         }
         r = axum::serve(listener, app) => {
             r.unwrap();
@@ -136,8 +142,6 @@ async fn run_server(sender: SyncSender<()>, port: u16) {
         }
     }
     // FIXME: now adjust the
-    sender.try_send(()).unwrap();
-
     state::merge_state(json!({"status": "done"})).unwrap();
 
     DRAW_SIGNAL.with(|signal| {
@@ -185,6 +189,14 @@ async fn load_default_template(args: &Args) {
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let args = Args::parse();
+
+    let orig_hook = panic::take_hook();
+    panic::set_hook(Box::new(move |panic_info| {
+        // invoke the default handler and exit the process
+        orig_hook(panic_info);
+        println!("Process paniced");
+        process::exit(1);
+    }));
 
     load_default_template(&args).await;
 
