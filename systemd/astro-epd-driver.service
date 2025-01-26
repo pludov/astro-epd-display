@@ -1,0 +1,21 @@
+[Unit]
+Description=Drive EPD screen
+Before=systemd-remount-fs.service
+DefaultDependencies=no
+Conflicts=shutdown.target
+Conflicts=reboot.target
+Before=reboot.target
+Before=shutdown.target
+
+[Service]
+Type=simple
+ExecStart=/opt/astro-epd-display/start-epd.sh
+ExecStop=/usr/bin/killall -2 astro-epd-display
+TimeoutStartSec=20
+TimeoutStopSec=20
+KillMode=process
+Restart=on-failure
+KillSignal=2
+
+[Install]
+WantedBy=systemd-remount-fs.service
