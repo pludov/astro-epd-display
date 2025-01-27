@@ -25,6 +25,12 @@ pub struct Args {
     #[command(subcommand)]
     pub driver: Option<Driver>,
 
+    #[arg(
+        long,
+        help = "Use input from this program for state update (ndjson expected)"
+    )]
+    pub scrape_command: Option<String>,
+
     #[arg(short, long, help = "Path to template")]
     pub template: Option<PathBuf>,
 

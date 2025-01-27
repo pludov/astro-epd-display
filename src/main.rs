@@ -6,6 +6,7 @@ mod device_driver;
 mod epd_driver;
 mod error;
 mod renderer;
+mod scraper;
 mod state;
 mod stdout_driver;
 mod templater;
@@ -14,6 +15,7 @@ use axum::{response::Html, routing::get, Router};
 use clap::Parser;
 use cli::Args;
 use device_driver::RefreshSignal;
+use scraper::start_scraper;
 use serde_json::json;
 use std::sync::mpsc::{Receiver, Sender};
 use tokio::signal::unix::{signal, SignalKind};
@@ -208,7 +210,10 @@ async fn main() {
 
     let local = task::LocalSet::new();
     local
-        .run_until(async move { run_server(sender, args.port).await })
+        .run_until(async move {
+            start_scraper(&args);
+            run_server(sender, args.port).await
+        })
         .await;
     driver.join().unwrap();
 }
