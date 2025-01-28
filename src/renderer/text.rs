@@ -1,3 +1,6 @@
+use crate::error::DrawingError;
+
+use super::drawing_error::IntoDrawingError;
 use super::{ColorFromTemplate, Point};
 use embedded_graphics::{mono_font::MonoFont, text::Alignment, Drawable};
 use embedded_graphics::{
@@ -52,9 +55,9 @@ pub fn resolve_font(font: &Option<String>) -> &MonoFont<'static> {
     }
 }
 
-pub fn draw_text<D, TargetColor>(display: &mut D, text: &TextItem) -> Result<(), D::Error>
+pub fn draw_text<D, TargetColor>(display: &mut D, text: &TextItem) -> Result<(), DrawingError>
 where
-    D: DrawTarget<Color = TargetColor>,
+    D: DrawTarget<Color = TargetColor, Error: IntoDrawingError>,
     TargetColor: PixelColor + ColorFromTemplate,
 {
     let style = MonoTextStyleBuilder::new()
@@ -69,6 +72,7 @@ where
     Text::with_text_style(&text.value, text.position.clone().into(), style, text_style)
         .draw(display)
         .map(|_| ())
+        .map_err(Into::into)
 }
 
 #[cfg(test)]

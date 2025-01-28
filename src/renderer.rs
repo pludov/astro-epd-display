@@ -1,12 +1,16 @@
 mod alignment;
+mod drawing_error;
 mod image;
 mod positioning;
 mod progress;
 mod qrcode;
 mod text;
 
+use std::fmt::Debug;
+
 use crate::binary_framebuffer::{BinarisedColor, BinaryFrameBuffer};
 use crate::error::Error;
+use drawing_error::IntoDrawingError;
 use embedded_graphics::primitives::Rectangle;
 use embedded_graphics::{pixelcolor::BinaryColor, prelude::*};
 use image::{draw_image, Image};
@@ -92,9 +96,10 @@ pub fn parse(yaml: serde_yaml::Value) -> Result<Vec<Primitive>, Error> {
 
 pub fn draw<D, TargetColor>(display: &mut D, primitives: &Vec<Primitive>) -> Result<(), Error>
 where
-    D: DrawTarget<Color = TargetColor>,
+    D: DrawTarget<Color = TargetColor, Error: IntoDrawingError>,
     TargetColor: PixelColor + ColorFromTemplate,
 {
+    let mut result: Result<(), Error> = Ok(());
     for primitive in primitives {
         println!("Rendering {:?}", primitive);
         let problem = match primitive {
@@ -106,11 +111,14 @@ where
                 progress::draw_progress::<D, TargetColor>(display, progress)
             }
         };
-        if problem.is_err() {
-            return Err(Error::DrawingError());
+        if let Err(err) = problem {
+            println!("Error rendering {:?}: {:?}", primitive, &err);
+            if result.is_ok() {
+                result = Err(Error::DrawingError(err.into()));
+            }
         }
     }
-    Ok(())
+    result
 }
 
 fn map_ascii(a: u8, b: u8) -> char {

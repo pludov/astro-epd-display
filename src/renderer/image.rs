@@ -1,6 +1,6 @@
 use std::fs::File;
 
-use crate::renderer::positioning::place_rectangle;
+use crate::{error::DrawingError, renderer::positioning::place_rectangle};
 
 use super::{
     positioning::{HorizontalAlignment, VerticalAlignment},
@@ -19,18 +19,24 @@ pub struct Image {
     pub vertical_align: Option<VerticalAlignment>,
 }
 
-pub fn draw_image<D, TargetColor>(display: &mut D, image: &Image) -> Result<(), D::Error>
+pub fn draw_image<D, TargetColor>(display: &mut D, image: &Image) -> Result<(), DrawingError>
 where
-    D: DrawTarget<Color = TargetColor>,
+    D: DrawTarget<Color = TargetColor, Error: Into<DrawingError>>,
     TargetColor: PixelColor + ColorFromTemplate,
 {
-    let mut decoder = png::Decoder::new(File::open(&image.path).unwrap());
+    let mut decoder = png::Decoder::new(
+        File::open(&image.path).map_err(|e| DrawingError::ResourceError(image.path.clone(), e))?,
+    );
     decoder.set_transformations(Transformations::normalize_to_color8());
-    let mut reader = decoder.read_info().unwrap();
+    let mut reader = decoder
+        .read_info()
+        .map_err(|e| DrawingError::ImageError(image.path.clone(), e))?;
     // Allocate the output buffer.
     let mut buf = vec![0; reader.output_buffer_size()];
     // Read the next frame. An APNG might contain multiple frames.
-    let info = reader.next_frame(&mut buf).unwrap();
+    let info = reader
+        .next_frame(&mut buf)
+        .map_err(|e| DrawingError::ImageError(image.path.clone(), e))?;
     // Grab the bytes of the image.
     let bytes = &buf[..info.buffer_size()];
 
@@ -90,7 +96,7 @@ where
                     if color.unwrap() { front } else { back },
                 ));
                 if pixels.len() >= 256 {
-                    display.draw_iter(pixels)?;
+                    display.draw_iter(pixels).map_err(|e| e.into())?;
                     pixels = Vec::with_capacity(256);
                 }
             }
@@ -99,7 +105,7 @@ where
         }
     }
 
-    display.draw_iter(pixels)?;
+    display.draw_iter(pixels).map_err(|e| e.into())?;
 
     Ok(())
 }

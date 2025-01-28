@@ -1,4 +1,4 @@
-use crate::renderer::positioning::place_rectangle;
+use crate::{error::DrawingError, renderer::positioning::place_rectangle};
 
 use super::{
     positioning::{Direction, HorizontalAlignment, VerticalAlignment},
@@ -29,9 +29,12 @@ pub struct Progress {
     pub base: Option<u32>,
 }
 
-pub fn draw_progress<D, TargetColor>(display: &mut D, progress: &Progress) -> Result<(), D::Error>
+pub fn draw_progress<D, TargetColor>(
+    display: &mut D,
+    progress: &Progress,
+) -> Result<(), DrawingError>
 where
-    D: DrawTarget<Color = TargetColor>,
+    D: DrawTarget<Color = TargetColor, Error: Into<DrawingError>>,
     TargetColor: PixelColor + ColorFromTemplate,
 {
     let (back, front) = (
@@ -75,13 +78,13 @@ where
                 },
             ));
             if pixels.len() >= 256 {
-                display.draw_iter(pixels)?;
+                display.draw_iter(pixels).map_err(Into::into)?;
                 pixels = Vec::with_capacity(256);
             }
         }
     }
 
-    display.draw_iter(pixels)?;
+    display.draw_iter(pixels).map_err(Into::into)?;
 
     Ok(())
 }

@@ -1,4 +1,7 @@
-use crate::binary_framebuffer::{BinarisedColor, BinaryFrameBuffer};
+use crate::{
+    binary_framebuffer::{BinarisedColor, BinaryFrameBuffer},
+    error::DrawingError,
+};
 
 use super::{ColorFromTemplate, Point};
 use embedded_graphics::pixelcolor::raw::RawU1;
@@ -150,9 +153,9 @@ impl Pixel for DummyPixel {
     }
 }
 
-pub fn draw_qrcode<D, TargetColor>(display: &mut D, qrcode: &QRCode) -> Result<(), D::Error>
+pub fn draw_qrcode<D, TargetColor>(display: &mut D, qrcode: &QRCode) -> Result<(), DrawingError>
 where
-    D: DrawTarget<Color = TargetColor>,
+    D: DrawTarget<Color = TargetColor, Error: Into<DrawingError>>,
     TargetColor: PixelColor + ColorFromTemplate,
 {
     let code = match qrcode.ec_level {
@@ -191,13 +194,15 @@ where
         (back, color)
     };
 
-    display.fill_solid(
-        &Rectangle {
-            top_left: qrcode.position.clone().into(),
-            size: Size::new(qrcode.width, qrcode.height),
-        },
-        back,
-    )?;
+    display
+        .fill_solid(
+            &Rectangle {
+                top_left: qrcode.position.clone().into(),
+                size: Size::new(qrcode.width, qrcode.height),
+            },
+            back,
+        )
+        .map_err(Into::into)?;
 
     let actual_size = res.dimensions();
 
@@ -217,19 +222,21 @@ where
     shift.0 += qrcode.position.x;
     shift.1 += qrcode.position.y;
 
-    display.draw_iter(
-        res.iter()
-            .into_iter()
-            .filter(|Pixel(_, c)| !c.to_binary_color())
-            .map(move |Pixel(p, c)| {
-                let c = c.to_binary_color();
-                let new_p = embedded_graphics::geometry::Point {
-                    x: p.x + shift.0,
-                    y: p.y + shift.1,
-                };
-                embedded_graphics::Pixel(new_p, if c { back } else { front })
-            }),
-    )?;
+    display
+        .draw_iter(
+            res.iter()
+                .into_iter()
+                .filter(|Pixel(_, c)| !c.to_binary_color())
+                .map(move |Pixel(p, c)| {
+                    let c = c.to_binary_color();
+                    let new_p = embedded_graphics::geometry::Point {
+                        x: p.x + shift.0,
+                        y: p.y + shift.1,
+                    };
+                    embedded_graphics::Pixel(new_p, if c { back } else { front })
+                }),
+        )
+        .map_err(Into::into)?;
 
     Ok(())
 }
