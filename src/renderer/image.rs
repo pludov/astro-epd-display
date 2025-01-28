@@ -17,6 +17,7 @@ pub struct Image {
     pub position: Point,
     pub align: Option<HorizontalAlignment>,
     pub vertical_align: Option<VerticalAlignment>,
+    pub invert: Option<bool>,
 }
 
 pub fn draw_image<D, TargetColor>(display: &mut D, image: &Image) -> Result<(), DrawingError>
@@ -45,10 +46,13 @@ where
         return Ok(());
     }
 
-    let (back, front) = (
+    let (mut back, mut front) = (
         TargetColor::resolve(&Some("0".to_string())),
         TargetColor::resolve(&Some("1".to_string())),
     );
+    if image.invert.unwrap_or(false) {
+        std::mem::swap(&mut back, &mut front);
+    }
 
     let origin = place_rectangle(
         embedded_graphics::geometry::Size {
@@ -130,6 +134,7 @@ mod tests {
                 position: Point { x: 16, y: 16 },
                 align: Some(HorizontalAlignment::Center),
                 vertical_align: Some(VerticalAlignment::Middle),
+                invert: None,
             })],
             None,
         );
