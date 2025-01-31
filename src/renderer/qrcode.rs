@@ -3,10 +3,10 @@ use crate::{
     error::DrawingError,
 };
 
-use super::{ColorFromTemplate, Point};
 use embedded_graphics::pixelcolor::raw::RawU1;
 use embedded_graphics::primitives::Rectangle;
 
+use super::{ColorFromTemplate, Point, Size};
 use embedded_graphics::prelude::*;
 
 use qrcode::render::{Canvas, Pixel};
@@ -198,7 +198,7 @@ where
         .fill_solid(
             &Rectangle {
                 top_left: qrcode.position.clone().into(),
-                size: Size::new(qrcode.width, qrcode.height),
+                size: embedded_graphics::prelude::Size::new(qrcode.width, qrcode.height),
             },
             back,
         )
@@ -251,7 +251,7 @@ mod tests {
     #[test]
     fn test_color_1() {
         let display = render(
-            Size {
+            embedded_graphics::prelude::Size {
                 width: 32,
                 height: 32,
             },
@@ -293,7 +293,7 @@ mod tests {
     #[test]
     fn test_color_0() {
         let display = render(
-            Size {
+            embedded_graphics::prelude::Size {
                 width: 32,
                 height: 32,
             },
@@ -335,7 +335,7 @@ mod tests {
     #[test]
     fn test_render_overflow() {
         let display = render(
-            Size {
+            embedded_graphics::prelude::Size {
                 width: 32,
                 height: 32,
             },
@@ -350,7 +350,7 @@ mod tests {
             })],
             Some(Rectangle::new(
                 embedded_graphics::prelude::Point { x: 0, y: 0 },
-                Size {
+                embedded_graphics::prelude::Size {
                     width: 32,
                     height: 32,
                 },
@@ -383,7 +383,7 @@ mod tests {
     #[test]
     fn test_render_fill() {
         let display = render(
-            Size {
+            embedded_graphics::prelude::Size {
                 width: 90,
                 height: 90,
             },

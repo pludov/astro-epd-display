@@ -125,7 +125,7 @@ mod tests {
     #[test]
     fn test_png() {
         let display = render(
-            Size {
+            embedded_graphics::prelude::Size {
                 width: 32,
                 height: 32,
             },

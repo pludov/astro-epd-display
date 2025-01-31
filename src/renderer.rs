@@ -1,4 +1,5 @@
 mod alignment;
+pub mod container;
 mod drawing_error;
 mod image;
 mod positioning;
@@ -9,7 +10,8 @@ mod text;
 use std::fmt::Debug;
 
 use crate::binary_framebuffer::{BinarisedColor, BinaryFrameBuffer};
-use crate::error::Error;
+use crate::error::{DrawingError, Error};
+use container::{draw_container, Container, ShiftedDisplay};
 use drawing_error::IntoDrawingError;
 use embedded_graphics::primitives::Rectangle;
 use embedded_graphics::{pixelcolor::BinaryColor, prelude::*};
@@ -58,6 +60,21 @@ impl Into<embedded_graphics::geometry::Point> for Point {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Size {
+    pub width: i32,
+    pub height: i32,
+}
+
+impl Into<embedded_graphics::geometry::Size> for Size {
+    fn into(self) -> embedded_graphics::geometry::Size {
+        embedded_graphics::geometry::Size::new(
+            std::cmp::max(self.width, 0) as u32,
+            std::cmp::max(self.height, 0) as u32,
+        )
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Dummy {}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -69,6 +86,7 @@ pub enum Primitive {
     QRCode(QRCode),
     Image(Image),
     Progress(Progress),
+    Container(Container),
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -94,27 +112,29 @@ pub fn parse(yaml: serde_yaml::Value) -> Result<Vec<Primitive>, Error> {
     Ok(primitives)
 }
 
-pub fn draw<D, TargetColor>(display: &mut D, primitives: &Vec<Primitive>) -> Result<(), Error>
+pub fn draw<D, TargetColor>(
+    display: &mut ShiftedDisplay<D, TargetColor, D::Error>,
+    primitives: &Vec<Primitive>,
+) -> Result<(), DrawingError>
 where
     D: DrawTarget<Color = TargetColor, Error: IntoDrawingError>,
     TargetColor: PixelColor + ColorFromTemplate,
 {
-    let mut result: Result<(), Error> = Ok(());
+    let mut result: Result<(), _> = Ok(());
     for primitive in primitives {
         println!("Rendering {:?}", primitive);
         let problem = match primitive {
             Primitive::Dummy(_) => Ok(()),
-            Primitive::Text(text) => draw_text::<D, TargetColor>(display, text),
-            Primitive::Image(image) => draw_image::<D, TargetColor>(display, image),
-            Primitive::QRCode(qr) => draw_qrcode::<D, TargetColor>(display, qr),
-            Primitive::Progress(progress) => {
-                progress::draw_progress::<D, TargetColor>(display, progress)
-            }
+            Primitive::Text(text) => draw_text(display, text),
+            Primitive::Image(image) => draw_image(display, image),
+            Primitive::QRCode(qr) => draw_qrcode(display, qr),
+            Primitive::Progress(progress) => progress::draw_progress(display, progress),
+            Primitive::Container(container) => draw_container(display, container),
         };
         if let Err(err) = problem {
             println!("Error rendering {:?}: {:?}", primitive, &err);
             if result.is_ok() {
-                result = Err(Error::DrawingError(err.into()));
+                result = Err(err);
             }
         }
     }
@@ -146,7 +166,7 @@ pub fn to_display_string<C: BinarisedColor>(
 
     let bounds = bounds.unwrap_or(Rectangle::new(
         embedded_graphics::prelude::Point { x: 0, y: 0 },
-        Size {
+        embedded_graphics::prelude::Size {
             width: buffer.width(),
             height: buffer.height(),
         },
@@ -222,7 +242,7 @@ mod tests {
     #[test]
     fn test_bit_rendering() {
         let w = 40;
-        let size = Size {
+        let size = embedded_graphics::prelude::Size {
             width: 40,
             height: 26,
         };
@@ -240,7 +260,7 @@ mod tests {
             &buffer,
             Some(Rectangle::new(
                 embedded_graphics::prelude::Point { x: 0, y: 0 },
-                Size {
+                embedded_graphics::prelude::Size {
                     width: 4,
                     height: 2,
                 },
@@ -256,7 +276,11 @@ mod tests {
         );
     }
 
-    pub fn render(size: Size, primitives: Vec<Primitive>, bounds: Option<Rectangle>) -> String {
+    pub fn render(
+        size: embedded_graphics::prelude::Size,
+        primitives: Vec<Primitive>,
+        bounds: Option<Rectangle>,
+    ) -> String {
         let mut buffer = BinaryFrameBuffer::<BinaryColor>::new(size.width, size.height);
         let mut display = FrameBuf::<BinaryColor, &mut BinaryFrameBuffer<BinaryColor>>::new(
             &mut buffer,
@@ -267,7 +291,9 @@ mod tests {
 
         display.clear(BinaryColor::On).unwrap();
 
-        let result = draw(&mut display, &primitives);
+        let mut shifted_display = ShiftedDisplay::from(&mut display);
+
+        let result = draw(&mut shifted_display, &primitives);
         result.unwrap();
 
         let display = to_display_string(&buffer, bounds);

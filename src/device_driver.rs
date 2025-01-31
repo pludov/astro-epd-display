@@ -6,7 +6,7 @@ use crate::{
     binary_change_tracker::BinaryChangeTracker,
     binary_framebuffer::{BinarisedColor, BinaryFrameBuffer},
     error::Error,
-    renderer::{self, ColorFromTemplate},
+    renderer::{self, container::ShiftedDisplay, ColorFromTemplate},
     state, templater,
 };
 use std::{
@@ -34,7 +34,9 @@ fn render<Color: PixelColor + BinarisedColor + ColorFromTemplate + Default>(
     );
     display.clear(Color::default()).unwrap();
 
-    renderer::draw(&mut display, &primitives)?;
+    let mut shifted_display = ShiftedDisplay::from(&mut display);
+
+    renderer::draw(&mut shifted_display, &primitives).map_err(Error::DrawingError)?;
 
     Ok(next)
 }

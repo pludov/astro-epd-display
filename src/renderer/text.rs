@@ -85,7 +85,7 @@ mod tests {
     #[test]
     fn test_render_default_font() {
         let display = render(
-            Size {
+            embedded_graphics::prelude::Size {
                 width: 90,
                 height: 128,
             },
