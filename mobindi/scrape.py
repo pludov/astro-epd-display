@@ -5,21 +5,19 @@
 # This python script run nmcli command to detect the wifi status
 # It outputs a json object with the wifi status
 
-from multiprocessing import Process, connection
-import subprocess
+import asyncio
 import json
 import sys
-import time
 
-def get_wifi_status():
+async def get_wifi_status():
     # Wifi will be null or connection name
     wifi = None
     hotspot = None
     ethernet = None
 
     cmd = "nmcli --terse --fields uuid,type,name con show --active"
-    process = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
-    output, error = process.communicate()
+    process = await asyncio.create_subprocess_exec(*cmd.split(), stdout=asyncio.subprocess.PIPE)
+    output, error = await process.communicate()
     output = output.decode("utf-8")
     # Split the output by newline
     output = output.split("\n")
@@ -36,9 +34,9 @@ def get_wifi_status():
         (uuid, type, name) = entry
         if type == "802-11-wireless":
             # Extract the 802-11-wireless.mode, ssid, wifi-sec.psk
-            process = subprocess.Popen(["nmcli", "--terse", "--show-secrets", "--fields", "802-11-wireless.ssid,802-11-wireless.mode,802-11-wireless-security.psk", "con", "show", "uuid", uuid], stdout=subprocess.PIPE)
+            process = await asyncio.create_subprocess_exec(*["nmcli", "--terse", "--show-secrets", "--fields", "802-11-wireless.ssid,802-11-wireless.mode,802-11-wireless-security.psk", "con", "show", "uuid", uuid], stdout=asyncio.subprocess.PIPE)
             # wifi-sec.psk
-            output, error = process.communicate()
+            output, error = await process.communicate()
             output = output.decode("utf-8")
             output = output.split("\n")
             dict = {}
@@ -65,17 +63,17 @@ def get_wifi_status():
     return json.dumps({"wifi": wifi, "hotspot": hotspot, "ethernet": ethernet})
 
 
-def wifi_monitor():
-    process = subprocess.Popen(["nmcli", "monitor"], stdout=subprocess.PIPE)
+async def wifi_monitor():
+    process = await asyncio.create_subprocess_exec(*["nmcli", "monitor"], stdout=asyncio.subprocess.PIPE)
     while True:
-        print(get_wifi_status(), flush=True)
-        process.stdout.readline()
+        print(await get_wifi_status(), flush=True)
+        await process.stdout.readline()
 
 
-def systemd_monitor():
+async def systemd_monitor():
     started_units = ["multi-user.target"]
     starting_units = ["local-fs.target"]
-
+    stopping_units = ["reboot.target", "shutdown.target" ]
     status = ""
 
     all_units = started_units + starting_units
@@ -83,8 +81,8 @@ def systemd_monitor():
         # Emit the running status according to:
         cmd = [ "systemctl", "list-units", "--quiet", "--full", "--plain", "--state=active", "--type=target", "--no-pager" ] + all_units
         # Capture the whole output
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-        output, error = process.communicate()
+        process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE)
+        output, error = await process.communicate()
         output = output.decode("latin-1")
         output = output.split("\n")
         active_units = {}
@@ -96,7 +94,7 @@ def systemd_monitor():
                 print(f"Error parsing systemctl output {len(entry)}", file=sys.stderr)
                 continue
             active_units[entry[0]] = True
-        print(json.dumps({"active_units": active_units}), flush=True)
+        
         new_status = ""
         for unit in starting_units:
             if unit in active_units:
@@ -106,25 +104,28 @@ def systemd_monitor():
             if unit in active_units:
                 new_status = "running"
                 break
+        for unit in stopping_units:
+            if unit in active_units:
+                new_status = "stopping"
+                break
         if new_status != status:
             status = new_status
             print(json.dumps({"status": status}), flush=True)
 
-        process.wait()
+        await process.wait()
 
         # Sleep one second before emitting the status
-        time.sleep(1)
+        await asyncio.sleep(1)
+
+
+async def main():
+
+    tasks = [
+        asyncio.create_task(wifi_monitor()),
+        asyncio.create_task(systemd_monitor()),
+    ]
+    await asyncio.gather(*tasks)
+
 
 if __name__ == '__main__':
-    
-    tasks = [
-        Process(target=wifi_monitor),
-        Process(target=systemd_monitor),
-    ]
-    for p in tasks:
-        p.daemon = True
-        p.start()
-    
-    # Wait the first process to finish
-    connection.wait(p.sentinel for p in tasks)
-
+    asyncio.run(main())
