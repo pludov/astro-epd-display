@@ -15,4 +15,4 @@ while ! [ -e /dev/gpiochip4 ]; do
 done
 
 export RUST_BACKTRACE=1
-exec /opt/astro-epd-display/astro-epd-display --template /opt/astro-epd-display/template.yaml --scraper /opt/astro-epd-display/scrape.py epd
+exec /opt/astro-epd-display/astro-epd-display --template /opt/astro-epd-display/template.yaml --scrape-command /opt/astro-epd-display/scrape.py epd
