@@ -1,6 +1,6 @@
 use embedded_graphics::{pixelcolor::BinaryColor, prelude::*, primitives::Rectangle};
 use embedded_graphics_framebuf::FrameBuf;
-use serde_json::Value;
+use serde_json::{json, Value};
 
 use crate::{
     binary_change_tracker::BinaryChangeTracker,
@@ -69,6 +69,12 @@ pub fn drive_device(
         height: device.height(),
     };
     println!("Size: {size}\n");
+
+    state::merge_state(
+        json!({"width": size.width, "height": size.height}),
+        RefreshSignal::Normal,
+    )
+    .expect("Merging size must succeed");
 
     let mut previous = BinaryFrameBuffer::<BinaryColor>::new(size.width, size.height);
     let mut buffer = BinaryFrameBuffer::<BinaryColor>::new(size.width, size.height);
