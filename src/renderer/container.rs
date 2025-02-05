@@ -230,6 +230,50 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_yaml_parsing() {
+        let example = Primitive::Container(Container {
+            size: Size {
+                width: 60,
+                height: 28,
+            },
+            position: Point { x: 2, y: 2 },
+            rotate: Some(1),
+            content: Some(vec![Primitive::Text(TextItem {
+                value: format!("Hi{}!", 1).to_string(),
+                position: Point { x: 0, y: 0 },
+                font: Some("4x6".to_string()),
+                color: Some("0".to_string()),
+                align: Some(Alignment::Left),
+            })]),
+        });
+
+        let yaml = serde_yaml::to_string(&example).unwrap();
+
+        assert_eq!(
+            yaml,
+            r#"
+!container
+position:
+  x: 2
+  y: 2
+size:
+  width: 60
+  height: 28
+rotate: 1
+content:
+- !text
+  value: Hi1!
+  position:
+    x: 0
+    y: 0
+  font: 4x6
+  color: '0'
+  align: left
+"#
+        );
+    }
+
+    #[test]
     fn test_container() {
         let display = render(
             embedded_graphics::prelude::Size {
