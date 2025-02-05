@@ -15,7 +15,7 @@
     size:
       width: {{ $height }}
       height: {{ $width }}
-    rotate: 1
+    rotate: 3
 
     content:
 {{ if .wifi }}
