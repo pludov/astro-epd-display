@@ -1,40 +1,69 @@
-{{ $width := 128 }}
-{{ $height := 296 }}
+{{ $width :=  .height }}
+{{ $height := .width }}
 {{ $freq := 240 }}
-{{ if eq .status "done" }}
 
+
+{{ if eq .status "done" }}
+# empty screen when the device is about to power down
 {{ else }}
-{{  if ( not .running ) }}
+
 -
-  text:
-    value: "Starting !"
-    font: "9X18_BOLD"
+  container:
     position:
-      x: {{ div $width 2 }}
-      y: 10
-    color: "1"
-    align: "center"
--
-  text:
-    value: "Elapsed {{ ( time 60 ) }}"
-    font: "9X18_BOLD"
-    position:
-      x: {{ div $width 2 }}
-      y: 46
-    color: "1"
-    align: "center"
+      x: 0
+      y: 0
+    size:
+      width: {{ $height }}
+      height: {{ $width }}
+    rotate: 1
+
+    content:
+{{ if .wifi }}
+      - !image
+        path: "resources/wifi-small.png"
+        invert: true
+        position:
+          x: 1
+          y: 1
+{{ end }}
+{{ if .ethernet }}
+      - !image
+        path: "resources/wifi-small.png"
+        invert: true
+        position:
+          x: 30
+          y: 1
+{{ end }}
+
+
+{{  if (eq .status "starting" ) }}
+      - !text
+        value: "Starting !"
+        font: "9X18_BOLD"
+        position:
+          x: {{ div $width 2 }}
+          y: 15
+        color: "1"
+        align: "center"
+      - !text
+        value: "Elapsed {{ ( time 60 ) }}"
+        font: "9X18_BOLD"
+        position:
+          x: {{ div $width 2 }}
+          y: 46
+        color: "1"
+        align: "center"
 
 {{ end }}
-{{ if .running }}
--
-  text:
-    value: "Running"
-    font: "9X18_BOLD"
-    position:
-      x: {{ (round (add (div $width  4) (mod (mul (div (time $freq) $freq ) 1889) (div $width  2)) ) ) }}
-      y: {{ (round (add (div $height 4) (mod (mul (div (time $freq) $freq ) 1979) (div $height 2)) ) ) }}
-    color: "1"
-    align: "center"
+{{ if (eq .status "running") }}
+      - !text
+        value: "Running"
+        font: "9X18_BOLD"
+        position:
+          x: {{ (round (add (div $width  4) (mod (mul (div (time $freq) $freq ) 1889) (div $width  2)) ) ) }}
+          y: {{ (round (add (div $height 4) (mod (mul (div (time $freq) $freq ) 1979) (div $height 2)) ) ) }}
+        color: "1"
+        align: "center"
 {{ end }}
 
 {{ end }}
