@@ -1,7 +1,14 @@
 {{ $width :=  .height }}
 {{ $height := .width }}
-{{ $freq := 240 }}
+{{ $rotate := 3 }}
+{{ $freq := 120 }}
 
+{{- define "clock_time" -}}
+  {{- $time :=  ( time 120 ) -}}
+  {{- $min := (mod (floor (div $time 60) ) 60) -}}
+  {{- $hour := (mod (floor (div $time 3600) ) 24) -}}
+  {{ lpad $hour 2 "0" }}:{{ lpad $min 2 "0" }}Z
+{{- end -}}
 
 {{ if eq .status "done" }}
 # empty screen when the device is about to power down
@@ -13,9 +20,9 @@
       x: 0
       y: 0
     size:
-      width: {{ $height }}
-      height: {{ $width }}
-    rotate: 3
+      width: {{ .width }}
+      height: {{ .height }}
+    rotate: {{ $rotate }}
 
     content:
 {{ if .wifi }}
@@ -46,7 +53,7 @@
         color: "1"
         align: "center"
       - !text
-        value: "Elapsed {{ ( time 60 ) }}"
+        value: "Clock: {{ template "clock_time" }}"
         font: "9X18_BOLD"
         position:
           x: {{ div $width 2 }}
@@ -57,7 +64,7 @@
 {{ end }}
 {{ if (eq .status "running") }}
       - !text
-        value: "Running"
+        value: "Ready {{ template "clock_time" }}"
         font: "9X18_BOLD"
         position:
           x: {{ (round (add (div $width  4) (mod (mul (div (time $freq) $freq ) 1889) (div $width  2)) ) ) }}

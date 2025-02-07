@@ -19,6 +19,7 @@ use yaml_merge_keys::{merge_keys_serde, serde_yaml};
 use crate::{device_driver::RefreshSignal, error::Error, state::get_state, trigger_draw};
 mod arithmetic;
 mod numeric;
+mod string;
 
 static TEMPLATE: Lazy<Mutex<Arc<String>>> = Lazy::new(|| Mutex::new(Arc::new("".to_string())));
 
