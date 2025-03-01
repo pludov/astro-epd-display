@@ -43,7 +43,7 @@
 {{ end }}
 
 
-{{  if (eq .status "starting" ) }}
+{{  if (eq .sysstatus "starting" ) }}
       - !text
         value: "Starting !"
         font: "9X18_BOLD"
@@ -62,7 +62,7 @@
         align: "center"
 
 {{ end }}
-{{ if (eq .status "running") }}
+{{ if (eq .sysstatus "running") }}
       - !text
         value: "Ready {{ template "clock_time" }}"
         font: "9X18_BOLD"

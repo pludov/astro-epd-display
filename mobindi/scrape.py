@@ -131,7 +131,7 @@ async def systemd_monitor():
                 break
         if new_status != status:
             status = new_status
-            print(json.dumps({"status": status}), flush=True)
+            print(json.dumps({"sysstatus": status}), flush=True)
 
         await process.wait()
 
