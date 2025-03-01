@@ -137,11 +137,18 @@ async fn post_root(payload: Json<Value>) -> Result<(), (StatusCode, String)> {
 
 pub fn merge_state(payload: Value, signal: RefreshSignal) -> Result<(), (StatusCode, String)> {
     let mut state = STATE.lock().unwrap();
-    // Do a deep merge of the state and the payload.
 
     let payload = cleanup(payload).or_else(handle_error)?;
 
-    state.root = Arc::new(deep_merge(state.root.borrow(), &payload));
+    // Do a deep merge of the state and the payload.
+    // Ignore the no-change case if the signal is RefreshSignal::Normal
+    let current_value = state.root.borrow();
+    let new_value = deep_merge(current_value, &payload);
+    if matches!(signal, RefreshSignal::Normal) && (new_value == *current_value) {
+        return Ok(());
+    }
+
+    state.root = Arc::new(new_value);
 
     trigger_draw(signal);
     Ok(())
