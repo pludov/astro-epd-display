@@ -78,10 +78,17 @@ async def get_wifi_status():
 
 
 async def wifi_monitor():
-    process = await asyncio.create_subprocess_exec(*["nmcli", "monitor"], stdout=asyncio.subprocess.PIPE)
     while True:
-        print(await get_wifi_status(), flush=True)
-        await process.stdout.readline()
+        process = await asyncio.create_subprocess_exec(*["nmcli", "monitor"], stdout=asyncio.subprocess.PIPE)
+        while True:
+            print(await get_wifi_status(), flush=True)
+            res = await process.stdout.readline()
+            if not res:
+                break
+        await process.wait()
+        print(f"nmcli monitor exited with {process.returncode}", file=sys.stderr)
+        # Sleep a few seconds before restarting the monitor
+        await asyncio.sleep(2)
 
 
 async def systemd_monitor():
