@@ -97,36 +97,43 @@ async def systemd_monitor():
     stopping_units = ["reboot.target", "shutdown.target" ]
     status = ""
 
-    all_units = started_units + starting_units
+    all_units = started_units + starting_units + stopping_units
     while True:
         # Emit the running status according to:
-        cmd = [ "systemctl", "list-units", "--quiet", "--full", "--plain", "--state=active", "--type=target", "--no-pager" ] + all_units
+        cmd = [ "systemctl", "list-units", "--quiet", "--full", "--plain", "--state=active", "--state=activating", "--type=target", "--no-pager" ] + all_units
         # Capture the whole output
         process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE)
         output, error = await process.communicate()
         output = output.decode("latin-1")
         output = output.split("\n")
         active_units = {}
+        activating_units = {}
         for entry in output:
             if entry == "":
                 continue
-            entry = entry.split(" ", 1)
-            if len(entry) != 2:
+            entry = entry.split(" ", 2)
+            if len(entry) != 3:
                 print(f"Error parsing systemctl output {len(entry)}", file=sys.stderr)
                 continue
-            active_units[entry[0]] = True
+            if entry[1] == "activating":
+                activating_units[entry[0]] = True
+            else:
+                active_units[entry[0]] = True
         
         new_status = ""
-        for unit in starting_units:
-            if unit in active_units:
-                new_status = "starting"
-                break
         for unit in started_units:
             if unit in active_units:
                 new_status = "running"
                 break
+        for unit in starting_units + started_units:
+            if unit in activating_units:
+                new_status = "starting"
+                break
         for unit in stopping_units:
             if unit in active_units:
+                new_status = "stopping"
+                break
+            if unit in activating_units:
                 new_status = "stopping"
                 break
         if new_status != status:

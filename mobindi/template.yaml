@@ -43,6 +43,25 @@
 {{ end }}
 
 
+{{  if (eq .sysstatus "stopping" ) }}
+      - !text
+        value: "Stopping !"
+        font: "9X18_BOLD"
+        position:
+          x: {{ div $width 2 }}
+          y: 15
+        color: "1"
+        align: "center"
+      - !text
+        value: "Clock: {{ template "clock_time" }}"
+        font: "9X18_BOLD"
+        position:
+          x: {{ div $width 2 }}
+          y: 46
+        color: "1"
+        align: "center"
+
+{{ end }}
 {{  if (eq .sysstatus "starting" ) }}
       - !text
         value: "Starting !"
