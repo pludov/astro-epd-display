@@ -31,6 +31,9 @@ pub struct Args {
     )]
     pub scrape_command: Option<String>,
 
+    #[arg(long, help = "initial json context")]
+    pub json: Vec<String>,
+
     #[arg(short, long, help = "Path to template")]
     pub template: Option<PathBuf>,
 

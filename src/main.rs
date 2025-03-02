@@ -185,6 +185,13 @@ async fn load_default_template(args: &Args) {
     }
 }
 
+fn init_state(json: &Vec<String>) {
+    for json in json {
+        let parsed = serde_json::from_str(json).expect("Error parsing JSON");
+        state::merge_state(parsed, RefreshSignal::Normal).expect("Error merging state");
+    }
+}
+
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let args = Args::parse();
@@ -198,6 +205,8 @@ async fn main() {
     }));
 
     load_default_template(&args).await;
+
+    init_state(&args.json);
 
     let (sender, receiver) = std::sync::mpsc::channel::<RefreshSignal>();
 
