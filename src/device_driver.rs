@@ -111,11 +111,11 @@ pub fn drive_device(
                 }
 
                 if force_full_render {
-                    device.update(buffer.buffer()).unwrap();
+                    device.update(buffer.buffer()).expect("refresh failed");
                 } else {
                     device
                         .partial_update(buffer.buffer(), &changed_rects)
-                        .unwrap();
+                        .expect("refresh partial failed");
                 }
                 if force_full_render {
                     force_full_render = false;
