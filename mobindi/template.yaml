@@ -1,6 +1,15 @@
-{{ $width :=  .height }}
-{{ $height := .width }}
-{{ $rotate := 3 }}
+{{ $rotate := (ternary .rotate .rotate 0) }}
+{{ $width :=  (ternary (mod $rotate 2) .height .width) }}
+{{ $height := (ternary (mod $rotate 2) .width .height) }}
+
+{{ $wifi1 := "resources/material-symbols--wifi-1-bar.png" }}
+{{ $wifi2 := "resources/material-symbols--wifi-2-bar.png" }}
+{{ $wifi3 := "resources/material-symbols--wifi-rounded.png" }}
+{{ $wifi_off := "resources/material-symbols--wifi-off.png" }}
+{{ $wifi_ap := "resources/mdi--access-point.png" }}
+{{ $eth_off := "resources/mdi--ethernet-off.png" }}
+{{ $eth_on := "resources/mdi--ethernet.png" }}
+
 {{ $freq := 120 }}
 
 {{- define "clock_time" -}}
@@ -14,6 +23,7 @@
 # empty screen when the device is about to power down
 {{ else }}
 
+
 -
   container:
     position:
@@ -25,22 +35,30 @@
     rotate: {{ $rotate }}
 
     content:
-{{ if .wifi }}
       - !image
-        path: "resources/wifi-small.png"
+{{ if (bool .hotspot) }}
+        path: "{{ $wifi_ap }}"
+{{ else }}
+{{ if (bool .wifi) }}
+        path: "{{ $wifi3 }}"
+{{ else }}
+        path: "{{ $wifi_off }}"
+{{ end }}
+{{ end }}
         invert: true
         position:
           x: 1
           y: 1
-{{ end }}
-{{ if .ethernet }}
       - !image
-        path: "resources/wifi-small.png"
+{{ if (bool .ethernet) }}
+        path: "{{ $eth_on }}"
+{{ else }}
+        path: "{{ $eth_off }}"
+{{ end }}
         invert: true
         position:
           x: 30
           y: 1
-{{ end }}
 
 
 {{  if (eq .sysstatus "stopping" ) }}
