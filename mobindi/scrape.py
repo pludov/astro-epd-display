@@ -93,14 +93,15 @@ async def wifi_monitor():
 
 async def systemd_monitor():
     started_units = ["multi-user.target"]
-    starting_units = ["local-fs.target"]
+    starting_units = [] # "local-fs.target"]
     stopping_units = ["reboot.target", "shutdown.target" ]
     status = ""
 
     all_units = started_units + starting_units + stopping_units
     while True:
         # Emit the running status according to:
-        cmd = [ "systemctl", "list-units", "--quiet", "--full", "--plain", "--state=active", "--state=activating", "--type=target", "--no-pager" ] + all_units
+        # , "--state=active", "--state=activating" "--state=inactive", 
+        cmd = [ "systemctl", "list-units", "--quiet", "--full", "--plain", "--type=target", "--no-pager" ]
         # Capture the whole output
         process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE)
         output, error = await process.communicate()
@@ -111,14 +112,15 @@ async def systemd_monitor():
         for entry in output:
             if entry == "":
                 continue
-            entry = entry.split(" ", 2)
-            if len(entry) != 3:
+            entry = entry.split(None, 3)
+            if len(entry) != 4:
                 print(f"Error parsing systemctl output {len(entry)}", file=sys.stderr)
                 continue
-            if entry[1] == "activating":
-                activating_units[entry[0]] = True
-            else:
+
+            if entry[2] == "active":
                 active_units[entry[0]] = True
+            else:
+                activating_units[entry[0]] = True
         
         new_status = ""
         for unit in started_units:
@@ -136,8 +138,10 @@ async def systemd_monitor():
             if unit in activating_units:
                 new_status = "stopping"
                 break
-        if new_status != status:
+        if new_status != "" and new_status != status:
             status = new_status
+            print(f"Status changed to {status}", file=sys.stderr)
+
             print(json.dumps({"sysstatus": status}), flush=True)
 
         await process.wait()
