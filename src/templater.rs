@@ -18,6 +18,8 @@ use yaml_merge_keys::{merge_keys_serde, serde_yaml};
 
 use crate::{device_driver::RefreshSignal, error::Error, state::get_state, trigger_draw};
 mod arithmetic;
+mod boolean;
+mod logic;
 mod numeric;
 mod string;
 
@@ -68,7 +70,7 @@ impl From<JsonToYaml> for gtmpl::Value {
             }
             Value::String(s) => gtmpl::Value::String(s),
             Value::Bool(b) => gtmpl::Value::Bool(b),
-            Value::Null => gtmpl::Value::String("null".to_string()),
+            Value::Null => gtmpl::Value::Nil,
         }
     }
 }
@@ -163,6 +165,7 @@ fn render_template(
     let mut tmpl = Template::default();
     tmpl.add_func("time", func_time);
     tmpl.add_funcs(&arithmetic::funcs());
+    tmpl.add_funcs(&logic::funcs());
     tmpl.parse((*template).clone())
         .map_err(Into::into)
         .map_err(Error::TemplateError)?;

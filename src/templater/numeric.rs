@@ -22,9 +22,13 @@ impl TmplToF64 for gtmpl::Value {
                 if v.is_some() {
                     return Ok(v.unwrap());
                 }
+                println!("unrecognized number = {:?}", n);
                 return Err(FuncError::UnableToConvertFromValue);
             }
-            _ => Err(FuncError::UnableToConvertFromValue),
+            n => {
+                println!("unrecognized number = {:?}", n);
+                Err(FuncError::UnableToConvertFromValue)
+            }
         }
     }
 }
