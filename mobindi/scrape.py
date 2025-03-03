@@ -9,6 +9,8 @@ import asyncio
 import json
 import sys
 import time
+import os
+import pathlib
 
 wifi_memory = {}
 
@@ -90,6 +92,57 @@ async def wifi_monitor():
         # Sleep a few seconds before restarting the monitor
         await asyncio.sleep(2)
 
+wifi_level_1 = 40
+wifi_level_2 = 72
+wifi_level_3 = 100
+wifi_hysteresis = 7
+
+def get_wifi_zone(level):
+    if level >= wifi_level_2:
+        return 2
+    elif level >= wifi_level_1:
+        return 1
+    else:
+        return 0
+
+def get_zone_extent(zone):
+    if zone == 2:
+        return (wifi_level_2  - wifi_hysteresis, wifi_level_3 + wifi_hysteresis)
+    elif zone == 1:
+        return (wifi_level_1 - wifi_hysteresis, wifi_level_2 + wifi_hysteresis)
+    else:
+        return (0, wifi_level_1 + wifi_hysteresis)
+
+async def wifi_level_monitor():
+    level = None
+    while True:
+        # Read /proc/net/wireless
+        cmd = ["awk", "{ tmp = match($3, /^[0-9.-]+$/); if (tmp) print $3 }", "/proc/net/wireless" ]
+        process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE)
+        output, error = await process.communicate()
+        output = output.decode("utf-8")
+        output = output.split("\n")
+
+        if len(output) < 1:
+            nextValue = None
+        else:
+            nextValue = float(output[0])
+
+        if nextValue is None:
+            if level is not None:
+                level = None
+                print(json.dumps({"wifi_level": level}), flush=True)
+        else:
+            # Implement a hysteresis
+            if level is None or nextValue < get_zone_extent(level)[0] or nextValue > get_zone_extent(level)[1]:
+                level = get_wifi_zone(nextValue)
+                print(json.dumps({"wifi_level": level}), flush=True)
+
+        # Sleep two second before next reading
+        await asyncio.sleep(2)
+
+
+
 
 async def systemd_monitor():
     started_units = ["multi-user.target"]
@@ -149,12 +202,30 @@ async def systemd_monitor():
         # Sleep one second before emitting the status
         await asyncio.sleep(1)
 
+async def bluetooth_monitor():
+    previous = None
+    while True:
+        current = False
+        # List the /dev directory for rfcomm* using asyncio
+        for f in pathlib.Path("/dev").glob("rfcomm*"):
+            current = True
+            break
+        if current != previous:
+            previous = current
+            print(json.dumps({"bt": current}), flush=True)
+        
+        # Sleep two second before emitting the status
+        await asyncio.sleep(2)
+
+
 
 async def main():
 
     tasks = [
         asyncio.create_task(wifi_monitor()),
+        asyncio.create_task(bluetooth_monitor()),
         asyncio.create_task(systemd_monitor()),
+        asyncio.create_task(wifi_level_monitor()),
     ]
     await asyncio.gather(*tasks)
 
