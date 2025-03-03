@@ -16,4 +16,4 @@ done
 
 export RUST_BACKTRACE=1
 cd /opt/astro-epd-display/ || exit 1
-exec /opt/astro-epd-display/astro-epd-display --json '{"rotate": 1}' --template /opt/astro-epd-display/template.yaml --scrape-command /opt/astro-epd-display/scrape.py epd
+exec /opt/astro-epd-display/astro-epd-display --json '{"rotate": 3}' --template /opt/astro-epd-display/template.yaml --scrape-command /opt/astro-epd-display/scrape.py epd
