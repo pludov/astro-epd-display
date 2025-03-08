@@ -126,7 +126,10 @@ async def wifi_level_monitor():
         if len(output) < 1:
             nextValue = None
         else:
-            nextValue = float(output[0])
+            try:
+                nextValue = float(output[0])
+            except ValueError:
+                nextValue = None
 
         if nextValue is None:
             if level is not None:
