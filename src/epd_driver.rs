@@ -30,6 +30,17 @@ impl EpdDevice {
         // Inverse the buffer so default is white
         let new_frame: Box<Vec<u8>> = Box::new(buffer.iter().map(|x| !x).collect());
         // FIXME: rotate
+        // Count the 0 bits in the frame
+        let counts = new_frame.iter().fold(0, |acc, x| {
+            acc + {
+                if *x != 0 {
+                    1
+                } else {
+                    0
+                }
+            } as u32
+        });
+        println!("Frame bit count: {counts}, full={full}");
 
         if !full && self.current_frame.is_some() && self.cur_partial < self.max_partial {
             if !self.memory_content {
