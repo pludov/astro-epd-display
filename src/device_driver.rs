@@ -111,8 +111,10 @@ pub fn drive_device(
                 }
 
                 if force_full_render {
+                    println!("Doing full update");
                     device.update(buffer.buffer()).expect("refresh failed");
                 } else {
+                    println!("Doing partial update");
                     device
                         .partial_update(buffer.buffer(), &changed_rects)
                         .expect("refresh partial failed");
@@ -121,6 +123,8 @@ pub fn drive_device(
                     force_full_render = false;
                     change_tracker.reset(&buffer, &mut previous);
                 }
+            } else {
+                println!("No change detected - no redraw");
             }
             sleep_limit = rendered.ok().flatten();
         }
